@@ -1,4 +1,4 @@
-// src/pages/reportes/LoginReportes.jsx - VERSIÓN COMPLETA ELEGANTE
+// src/pages/reportes/LoginReportes.jsx - VERSIÓN COMPLETA CORREGIDA
 import React, { useState } from 'react';
 import './LoginReportes.css';
 
@@ -58,9 +58,9 @@ const LoginReportes = () => {
         document.querySelector('.login-card').style.transform = 'scale(0.95)';
         setTimeout(() => {
           if (usuario.rol === 'gerente') {
-            window.location.href = '/reportes-gerson';
+            window.location.href = '/la-perrada-pos/reportes-gerson';
           } else {
-            window.location.href = '/reportes-admin';
+            window.location.href = '/la-perrada-pos/reportes-admin';
           }
         }, 300);
       } else {
@@ -260,7 +260,7 @@ const LoginReportes = () => {
           </div>
           
           <button 
-            onClick={() => window.location.href = '/'}
+            onClick={() => window.location.href = '/la-perrada-pos/'}
             className="back-to-pos-btn"
           >
             ← Volver al POS

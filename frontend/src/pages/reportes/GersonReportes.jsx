@@ -1,4 +1,4 @@
-// src/pages/reportes/GersonReportes.jsx - VERSIÓN 100% CORREGIDA CON CÁLCULOS CORRECTOS
+// src/pages/reportes/GersonReportes.jsx - VERSIÓN 100% CORREGIDA
 import React, { useState, useEffect, useCallback } from 'react';
 import './ReportesComunes.css';
 import products from "../../data/products.js";
@@ -901,7 +901,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
 
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
-    window.location.href = '/reportes';
+    window.location.href = '/la-perrada-pos/reportes';
   };
 
   const formatearHora = (fecha) => {
@@ -1009,7 +1009,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
           </p>
           <div className="flex gap-2 mt-2 flex-wrap">
             <button 
-              onClick={() => window.location.href = '/'}
+              onClick={() => window.location.href = '/la-perrada-pos/'}
               className="back-pos-btn"
               style={{background: "rgba(255,255,255,0.1)", color: "white", borderColor: "white"}}
             >
@@ -1598,7 +1598,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
         <div className="fiados-header">
           <div>
             <span className="fiados-pendientes">
-              Fiados pendientes: ${fiados.filter((f) => f.estado === "pendiente").length}
+              Fiados pendientes: {fiados.filter((f) => f.estado === "pendiente").length}
             </span>
             <span className="fiados-total">
               Total pendiente: ${fiados

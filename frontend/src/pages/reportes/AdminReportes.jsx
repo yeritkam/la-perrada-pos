@@ -1,4 +1,4 @@
-// src/pages/reportes/AdminReportes.jsx - VERSIÓN 100% CORREGIDA CON CÁLCULOS CORRECTOS
+// src/pages/reportes/AdminReportes.jsx - VERSIÓN 100% CORREGIDA
 import React, { useState, useEffect, useCallback } from 'react';
 import './ReportesComunes.css';
 import products from "../../data/products.js";
@@ -601,7 +601,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
 
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
-    window.location.href = '/reportes';
+    window.location.href = '/la-perrada-pos/reportes';
   };
 
   const formatearHora = (fecha) => {
@@ -707,7 +707,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
           <p className="fecha">{fechaSeleccionada ? formatearFecha(fechaSeleccionada) : "Selecciona una fecha"}</p>
           <div className="flex gap-2 mt-2 flex-wrap">
             <button 
-              onClick={() => window.location.href = '/'}
+              onClick={() => window.location.href = '/la-perrada-pos/'}
               className="back-pos-btn"
             >
               ← Volver al POS
