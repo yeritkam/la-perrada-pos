@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import AdminReportes from "./reportes/AdminReportes";
 import GersonReportes from "./reportes/GersonReportes";
-import syncStorage from "../firebase/storage.js";
 
 // Componente de Login CORREGIDO
 const LoginReportes = ({ onLogin }) => {
@@ -291,7 +290,7 @@ const LoginReportes = ({ onLogin }) => {
 
   const currentUser = usuarios[selectedUser];
   const passwordHint = selectedUser === "admin" 
-    ? `💡 Contraseña de administrador: 12345`
+    ? `💡 Ingresa la contraseña de administrador`
     : `💡 Ingresa la contraseña de gerencia`;
 
   return (
@@ -375,7 +374,7 @@ const LoginReportes = ({ onLogin }) => {
                     fontWeight: 'bold',
                     fontSize: '18px',
                     textAlign: 'center',
-                    paddingLeft: '15px' // Centrar mejor
+                    paddingLeft: '15px'
                   }}
                 />
               </div>
@@ -408,7 +407,7 @@ const LoginReportes = ({ onLogin }) => {
                 />
               </div>
               
-              {/* HINT DE CONTRASEÑA - SOLO PARA ADMIN */}
+              {/* HINT DE CONTRASEÑA - SIN MOSTRAR CONTRASEÑA */}
               <div style={{
                 ...styles.passwordHint,
                 ...(selectedUser === "admin" ? styles.adminPasswordHint : styles.gerentePasswordHint)
@@ -462,10 +461,10 @@ const LoginReportes = ({ onLogin }) => {
               )}
             </button>
             
-            {/* Botón volver al POS */}
+            {/* Botón volver al POS - CORREGIDO */}
             <button
               type="button"
-              onClick={() => window.location.href = '/'}
+              onClick={() => window.location.href = '/la-perrada-pos/'}
               style={{
                 ...styles.button,
                 ...styles.secondaryButton
@@ -550,6 +549,7 @@ const Reportes = () => {
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
     setUsuario(null);
+    window.location.href = '/la-perrada-pos/reportes';
   };
 
   if (cargando) {

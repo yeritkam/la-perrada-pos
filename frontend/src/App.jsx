@@ -14,18 +14,18 @@ function App() {
       <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-3 px-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* LOGO - USANDO RUTA DESDE PUBLIC */}
+            {/* LOGO - SOLUCIÓN SEGURA CON PUBLIC_URL */}
             <div className="flex items-center gap-2">
               <div className="bg-white p-2 rounded-lg">
                 <img 
-                  src="/logo.png"  // ✅ Ruta absoluta desde public/
+                  src={`${process.env.PUBLIC_URL}/logo.png`}
                   alt="Logo La Perrada de Piter"
                   className="h-8 w-8 object-contain"
                   onError={(e) => {
                     console.log("Error cargando logo, usando emoji");
                     e.target.onerror = null;
                     e.target.style.display = 'none';
-                    // Crear elemento de fallback
+                    // Fallback a emoji
                     const parent = e.target.parentElement;
                     const fallback = document.createElement('div');
                     fallback.className = 'text-2xl';
@@ -53,8 +53,8 @@ function App() {
         <Route path="/pos" element={<POS />} />
         <Route path="/kitchen" element={<Kitchen />} />
         <Route path="/reportes" element={<Reportes />} />
-        <Route path="/admin-reportes" element={<AdminReportes />} />
-        <Route path="/gerson-reportes" element={<GersonReportes />} />
+        <Route path="/reportes-admin" element={<AdminReportes />} />
+        <Route path="/reportes-gerson" element={<GersonReportes />} />
         <Route path="/login-reportes" element={<LoginReportes />} />
       </Routes>
 

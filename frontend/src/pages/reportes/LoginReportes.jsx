@@ -89,14 +89,14 @@ const LoginReportes = () => {
     if (!selectedRole) return;
     
     const usuario = usuarios[selectedRole];
-    const mensaje = `Clave para ${usuario.nombre}: ${usuario.clave}`;
+    const mensaje = `Contacta al administrador para recuperar tu acceso.`;
     
     // Mostrar modal elegante
     const modal = document.createElement('div');
     modal.className = 'password-modal';
     modal.innerHTML = `
       <div class="modal-content">
-        <h3>🔐 Clave de acceso</h3>
+        <h3>🔐 Recuperar acceso</h3>
         <p>${mensaje}</p>
         <button onclick="this.parentElement.parentElement.remove()">Cerrar</button>
       </div>
