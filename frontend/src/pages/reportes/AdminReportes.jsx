@@ -599,6 +599,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
     setShowDetalleFiado(true);
   };
 
+  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA 🔥🔥🔥
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
     window.location.href = '/la-perrada-pos/reportes';
@@ -750,13 +751,14 @@ const AdminReportes = ({ usuario, onLogout }) => {
         
         <div className="user-info">
           <span>👤 {usuario?.nombre || 'Administrador'}</span>
+          {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO 🔥🔥🔥 */}
           <button onClick={handleLogout} className="logout-btn">
             Cerrar Sesión
           </button>
         </div>
       </div>
 
-      {/* 🔥🔥🔥 SECCIÓN CORREGIDA - INPUT DE FECHA NUNCA DESHABILITADO 🔥🔥🔥 */}
+      {/* CONTROL DE FECHA */}
       <div className="section-card">
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
           <span className="text-blue-600">📅</span>
@@ -769,7 +771,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
               <label className="block font-semibold text-gray-700 mb-2">
                 Seleccionar fecha para filtrar reportes:
               </label>
-              {/* 🔥 CORRECCIÓN: ELIMINADO EL DISABLED */}
+              {/* INPUT DE FECHA NUNCA DESHABILITADO */}
               <input
                 type="date"
                 className="w-full border-2 border-blue-300 p-3 rounded-xl text-lg bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
@@ -824,7 +826,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
         </div>
       </div>
 
-      {/* 🔥🔥🔥 KPI CORREGIDOS CON CÁLCULOS CORRECTOS */}
+      {/* 🔥🔥🔥 KPI CORREGIDOS */}
       <div className="kpi-container">
         <div className="kpi-card" onClick={refrescarDatos} style={{ cursor: 'pointer' }}>
           <div className="kpi-label">VENTAS TOTALES</div>

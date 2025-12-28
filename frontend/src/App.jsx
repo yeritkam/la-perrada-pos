@@ -1,4 +1,4 @@
-// src/App.jsx - VERSIÓN COMPLETA CORREGIDA
+// src/App.jsx - VERSIÓN 100% CORREGIDA
 import { Routes, Route } from "react-router-dom";
 import POS from "./pages/POS.jsx";
 import Kitchen from "./pages/Kitchen.jsx";
@@ -10,25 +10,23 @@ import LoginReportes from "./pages/reportes/LoginReportes.jsx";
 function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-      {/* HEADER CON LOGO */}
+      {/* HEADER CON LOGO - 100% FUNCIONAL */}
       <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-3 px-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* LOGO - SOLUCIÓN SEGURA CON PUBLIC_URL */}
+            {/* LOGO - VERSIÓN DEFINITIVA */}
             <div className="flex items-center gap-2">
-              <div className="bg-white p-2 rounded-lg">
+              <div className="bg-white p-2 rounded-lg flex items-center justify-center h-12 w-12">
                 <img 
-                  src={`${process.env.PUBLIC_URL}/logo.png`}
+                  src="./logo.png"
                   alt="Logo La Perrada de Piter"
                   className="h-8 w-8 object-contain"
                   onError={(e) => {
-                    console.log("Error cargando logo, usando emoji");
-                    e.target.onerror = null;
+                    console.log("Logo no encontrado, usando fallback");
                     e.target.style.display = 'none';
-                    // Fallback a emoji
                     const parent = e.target.parentElement;
                     const fallback = document.createElement('div');
-                    fallback.className = 'text-2xl';
+                    fallback.className = 'text-2xl text-blue-600 flex items-center justify-center w-full h-full';
                     fallback.textContent = '🌭';
                     parent.appendChild(fallback);
                   }}

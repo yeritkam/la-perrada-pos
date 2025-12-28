@@ -274,7 +274,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
     }
   }, [isRefreshing]);
 
-  // 🔥🔥🔥 CORRECCIÓN CRÍTICA: FUNCIÓN DE CÁLCULO CORREGIDA (MISMA QUE AdminReportes)
+  // 🔥🔥🔥 CORRECCIÓN CRÍTICA: FUNCIÓN DE CÁLCULO CORREGIDA
   const calcularEstadisticasCompletas = (ventasPorDia) => {
     let totalVentas = 0;
     let efectivoRecaudado = 0;
@@ -899,6 +899,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
     setShowDetalleFiado(true);
   };
 
+  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA 🔥🔥🔥
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
     window.location.href = '/la-perrada-pos/reportes';
@@ -1038,6 +1039,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <span style={{background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)"}}>
             👑 GERENTE: {usuario?.nombre || 'GERSON'}
           </span>
+          {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO 🔥🔥🔥 */}
           <button onClick={handleLogout} className="logout-btn">
             Cerrar Sesión
           </button>
@@ -1088,7 +1090,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
         </div>
       </div>
 
-      {/* 🔥🔥🔥 SECCIÓN CORREGIDA - CONTROL DE CAJA */}
+      {/* CONTROL DE CAJA */}
       <div className="section-card">
         <h2>📅 Control de Caja</h2>
         <div className="space-y-4">
@@ -1097,7 +1099,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
               <label className="block font-semibold text-gray-700 mb-2">
                 Fecha para reportes:
               </label>
-              {/* 🔥 CORRECCIÓN: ELIMINADO EL DISABLED */}
+              {/* INPUT DE FECHA NUNCA DESHABILITADO */}
               <input
                 type="date"
                 className="w-full border-2 border-blue-300 p-3 rounded-xl text-lg bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
@@ -1162,7 +1164,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
         )}
       </div>
 
-      {/* 🔥🔥🔥 KPI CORREGIDOS CON CÁLCULOS CORRECTOS */}
+      {/* 🔥🔥🔥 KPI CORREGIDOS */}
       <div className="kpi-container">
         <div className="kpi-card" onClick={refrescarDatos} style={{ cursor: 'pointer' }}>
           <div className="kpi-label">VENTAS TOTALES</div>

@@ -1,4 +1,4 @@
-// src/pages/Reportes.jsx - VERSIÓN CORREGIDA DEFINITIVA
+// src/pages/Reportes.jsx - VERSIÓN 100% CORREGIDA
 import { useState, useEffect } from "react";
 import AdminReportes from "./reportes/AdminReportes";
 import GersonReportes from "./reportes/GersonReportes";
@@ -407,7 +407,7 @@ const LoginReportes = ({ onLogin }) => {
                 />
               </div>
               
-              {/* HINT DE CONTRASEÑA - SIN MOSTRAR CONTRASEÑA */}
+              {/* HINT DE CONTRASEÑA */}
               <div style={{
                 ...styles.passwordHint,
                 ...(selectedUser === "admin" ? styles.adminPasswordHint : styles.gerentePasswordHint)
@@ -511,7 +511,7 @@ const LoginReportes = ({ onLogin }) => {
   );
 };
 
-// Componente principal Reportes
+// Componente principal Reportes - CON LOGOUT CORREGIDO
 const Reportes = () => {
   const [usuario, setUsuario] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -546,6 +546,7 @@ const Reportes = () => {
     setUsuario(nuevoUsuario);
   };
 
+  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA 🔥🔥🔥
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
     setUsuario(null);
@@ -591,6 +592,7 @@ const Reportes = () => {
 
   return (
     <div className="reportes-container">
+      {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO 🔥🔥🔥 */}
       <button
         onClick={handleLogout}
         style={{

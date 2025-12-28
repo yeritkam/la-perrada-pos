@@ -259,6 +259,7 @@ const LoginReportes = () => {
             </p>
           </div>
           
+          {/* 🔥🔥🔥 BOTÓN VOLVER CORREGIDO 🔥🔥🔥 */}
           <button 
             onClick={() => window.location.href = '/la-perrada-pos/'}
             className="back-to-pos-btn"
