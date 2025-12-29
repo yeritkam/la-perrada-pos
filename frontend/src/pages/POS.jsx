@@ -321,14 +321,14 @@ export default function POS() {
   const getCat = (p) => p.categoria ?? p.category ?? "Sin categoría";
   const getId = (p) => p.id ?? p._id ?? Math.random().toString();
 
-  // FUNCIÓN PARA OBTENER RUTA CORRECTA DEL LOGO
+  // 🔥🔥🔥 FUNCIÓN PARA OBTENER RUTA CORRECTA DEL LOGO - CORREGIDA 🔥🔥🔥
   const getLogoPath = () => {
-    // Si estamos en desarrollo local
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return '/logo.png';
+    // Detectar si estamos en GitHub Pages
+    if (window.location.hostname.includes('github.io')) {
+      return '/la-perrada-pos/logo.png';
     }
-    // Si estamos en GitHub Pages
-    return '/la-perrada-pos/logo.png';
+    // Si estamos en desarrollo local
+    return '/logo.png';
   };
 
   // GUARDAR MESAS CON FECHA AUTOMÁTICA

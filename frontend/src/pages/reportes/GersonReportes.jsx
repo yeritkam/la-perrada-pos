@@ -43,11 +43,17 @@ const GersonReportes = ({ usuario, onLogout }) => {
     localStorage.removeItem('fechaActiva');
     localStorage.removeItem('estadoCaja');
     
-    // Forzar recarga completa
+    // Detectar si estamos en GitHub Pages
+    const isGitHubPages = window.location.hostname.includes('github.io');
+    const basePath = isGitHubPages ? '/la-perrada-pos' : '';
+    
+    // Redirigir a la página de login
+    window.location.href = basePath + '/reportes';
+    
+    // Forzar recarga completa si no redirige
     setTimeout(() => {
-      window.location.href = window.location.origin + '/la-perrada-pos/reportes';
       window.location.reload(true);
-    }, 50);
+    }, 100);
   };
 
   useEffect(() => {
@@ -1018,7 +1024,11 @@ const GersonReportes = ({ usuario, onLogout }) => {
           </p>
           <div className="flex gap-2 mt-2 flex-wrap">
             <button 
-              onClick={() => window.location.href = '/la-perrada-pos/'}
+              onClick={() => {
+                const isGitHubPages = window.location.hostname.includes('github.io');
+                const basePath = isGitHubPages ? '/la-perrada-pos' : '';
+                window.location.href = basePath + '/';
+              }}
               className="back-pos-btn"
               style={{background: "rgba(255,255,255,0.1)", color: "white", borderColor: "white"}}
             >

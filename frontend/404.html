@@ -1,14 +1,116 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <meta charset="utf-8">
-    <title>Redirecting...</title>
+    <meta charset="UTF-8">
+    <title>La Perrada de Piter - Redirección</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 16px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .logo {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 12px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-top: 20px;
+        }
+        .button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
     <script>
-        sessionStorage.redirect = location.href;
-        window.location.href = "/";
+        // Detectar si estamos en GitHub Pages
+        const isGitHubPages = window.location.hostname.includes('github.io');
+        const basePath = isGitHubPages ? '/la-perrada-pos' : '';
+        
+        // Guardar la ruta actual antes de redirigir
+        sessionStorage.setItem('redirectPath', window.location.pathname);
+        
+        // Redirigir después de 2 segundos (para mostrar mensaje)
+        setTimeout(() => {
+            window.location.href = basePath + '/';
+        }, 2000);
+        
+        // También redirigir inmediatamente si hay JavaScript
+        window.location.href = basePath + '/';
     </script>
 </head>
 <body>
-    <p>Redirecting to POS La Perrada...</p>
+    <div class="container">
+        <div class="logo">🌭</div>
+        <h1>Redireccionando al Sistema POS</h1>
+        <p>La página que buscas ha sido movida o no existe.</p>
+        <p>Serás redirigido automáticamente al sistema principal.</p>
+        
+        <div class="loading">
+            <div class="spinner"></div>
+            <span>Redirigiendo...</span>
+        </div>
+        
+        <p style="margin-top: 30px; font-size: 14px; opacity: 0.7;">
+            Si no eres redirigido automáticamente en 5 segundos,
+            haz clic en el botón:
+        </p>
+        
+        <a href="/la-perrada-pos/" class="button">
+            🏪 Ir al Sistema POS
+        </a>
+    </div>
 </body>
 </html>

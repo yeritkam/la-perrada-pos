@@ -60,6 +60,15 @@ const LoginReportes = ({ onLogin }) => {
     }
   };
 
+  // 🔥🔥🔥 BOTÓN VOLVER CORREGIDO 🔥🔥🔥
+  const handleBackToPOS = () => {
+    // Detectar si estamos en GitHub Pages
+    const isGitHubPages = window.location.hostname.includes('github.io');
+    const basePath = isGitHubPages ? '/la-perrada-pos' : '';
+    
+    window.location.href = basePath + '/';
+  };
+
   // ESTILOS
   const styles = {
     container: {
@@ -461,10 +470,10 @@ const LoginReportes = ({ onLogin }) => {
               )}
             </button>
             
-            {/* Botón volver al POS - CORREGIDO A LO QUE FUNCIONABA */}
+            {/* 🔥🔥🔥 BOTÓN VOLVER CORREGIDO 🔥🔥🔥 */}
             <button
               type="button"
-              onClick={() => window.location.href = '/'}
+              onClick={handleBackToPOS}
               style={{
                 ...styles.button,
                 ...styles.secondaryButton
@@ -546,11 +555,21 @@ const Reportes = () => {
     setUsuario(nuevoUsuario);
   };
 
-  // 🔥🔥🔥 LOGOUT CORREGIDO - VERSIÓN QUE FUNCIONABA 🔥🔥🔥
+  // 🔥🔥🔥 LOGOUT CORREGIDO - FUNCIONAL PARA TODO 🔥🔥🔥
   const handleLogout = () => {
+    // Limpiar todo
     localStorage.removeItem('reportes_usuario');
-    setUsuario(null);
-    window.location.href = '/reportes'; // ← ASÍ FUNCIONABA
+    localStorage.removeItem('fechaActiva');
+    localStorage.removeItem('estadoCaja');
+    
+    // Forzar recarga completa
+    setTimeout(() => {
+      const isGitHubPages = window.location.hostname.includes('github.io');
+      const basePath = isGitHubPages ? '/la-perrada-pos' : '';
+      
+      window.location.href = basePath + '/reportes';
+      window.location.reload(true);
+    }, 50);
   };
 
   if (cargando) {
