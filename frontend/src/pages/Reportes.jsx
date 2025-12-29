@@ -1,9 +1,9 @@
-// src/pages/Reportes.jsx - VERSIÓN 100% CORREGIDA
+// src/pages/Reportes.jsx - VERSIÓN COMPLETA CORREGIDA
 import { useState, useEffect } from "react";
 import AdminReportes from "./reportes/AdminReportes";
 import GersonReportes from "./reportes/GersonReportes";
 
-// Componente de Login CORREGIDO
+// Componente de Login
 const LoginReportes = ({ onLogin }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -11,7 +11,7 @@ const LoginReportes = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState("admin");
 
-  // Definir usuarios - NOMBRES EN MAYÚSCULAS
+  // Definir usuarios
   const usuarios = {
     "admin": { 
       password: "12345", 
@@ -60,7 +60,7 @@ const LoginReportes = ({ onLogin }) => {
     }
   };
 
-  // ESTILOS CORREGIDOS
+  // ESTILOS
   const styles = {
     container: {
       minHeight: '100vh',
@@ -461,10 +461,10 @@ const LoginReportes = ({ onLogin }) => {
               )}
             </button>
             
-            {/* Botón volver al POS - CORREGIDO */}
+            {/* Botón volver al POS - CORREGIDO A LO QUE FUNCIONABA */}
             <button
               type="button"
-              onClick={() => window.location.href = '/la-perrada-pos/'}
+              onClick={() => window.location.href = '/'}
               style={{
                 ...styles.button,
                 ...styles.secondaryButton
@@ -511,7 +511,7 @@ const LoginReportes = ({ onLogin }) => {
   );
 };
 
-// Componente principal Reportes - CON LOGOUT CORREGIDO
+// Componente principal Reportes
 const Reportes = () => {
   const [usuario, setUsuario] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -546,11 +546,11 @@ const Reportes = () => {
     setUsuario(nuevoUsuario);
   };
 
-  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA 🔥🔥🔥
+  // 🔥🔥🔥 LOGOUT CORREGIDO - VERSIÓN QUE FUNCIONABA 🔥🔥🔥
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
     setUsuario(null);
-    window.location.href = '/la-perrada-pos/reportes';
+    window.location.href = '/reportes'; // ← ASÍ FUNCIONABA
   };
 
   if (cargando) {
@@ -592,7 +592,7 @@ const Reportes = () => {
 
   return (
     <div className="reportes-container">
-      {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO 🔥🔥🔥 */}
+      {/* BOTÓN LOGOUT - CORREGIDO */}
       <button
         onClick={handleLogout}
         style={{

@@ -1,4 +1,4 @@
-// src/pages/reportes/AdminReportes.jsx - VERSIÓN 100% CORREGIDA
+// src/pages/reportes/AdminReportes.jsx - VERSIÓN COMPLETA CORREGIDA
 import React, { useState, useEffect, useCallback } from 'react';
 import './ReportesComunes.css';
 import products from "../../data/products.js";
@@ -21,7 +21,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sincronizacionActiva, setSincronizacionActiva] = useState(false);
   const [ventas, setVentas] = useState([]);
-  const [baseCaja, setBaseCaja] = useState(10000); // 🔥 Base de caja por defecto
+  const [baseCaja, setBaseCaja] = useState(10000);
 
   const [nuevoFiado, setNuevoFiado] = useState({
     nombre: "",
@@ -29,12 +29,25 @@ const AdminReportes = ({ usuario, onLogout }) => {
     fechaFiado: "",
   });
 
+  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA Y FUNCIONAL 🔥🔥🔥
+  const handleLogout = () => {
+    // Limpiar todo
+    localStorage.removeItem('reportes_usuario');
+    localStorage.removeItem('fechaActiva');
+    localStorage.removeItem('estadoCaja');
+    
+    // Forzar recarga completa
+    setTimeout(() => {
+      window.location.href = window.location.origin + '/la-perrada-pos/reportes';
+      window.location.reload(true);
+    }, 50);
+  };
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         console.log("📥 AdminReportes: Cargando datos iniciales...");
         
-        // FECHA ACTIVA - SIEMPRE cargar desde syncStorage primero
         const fecha = await syncStorage.getItem("fechaActiva");
         console.log("📅 Fecha cargada de Firebase:", fecha);
         
@@ -46,7 +59,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
           setFechaSeleccionada(fechaLocal);
         }
         
-        // ESTADO CAJA
         const estado = await syncStorage.getItem("estadoCaja");
         if (estado !== null && estado !== undefined) {
           setEstadoCaja(estado);
@@ -54,7 +66,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
           setEstadoCaja(localStorage.getItem("estadoCaja") || "cerrada");
         }
         
-        // FIADOS
         const fiadosData = await syncStorage.getItem("fiados");
         console.log("📦 Fiados cargados:", fiadosData, "Tipo:", typeof fiadosData);
         
@@ -76,7 +87,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
           }
         }
         
-        // VENTAS
         const ventasData = await syncStorage.getItem("sales");
         console.log("📊 Ventas cargadas:", ventasData, "Tipo:", typeof ventasData);
         
@@ -122,7 +132,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
 
     loadInitialData();
 
-    // LISTENERS EN TIEMPO REAL
     const unsubscribeFecha = syncStorage.syncItem("fechaActiva", (newFecha) => {
       console.log("🔄 Sincronización fecha activa:", newFecha);
       if (newFecha !== null && newFecha !== undefined) {
@@ -184,7 +193,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
     };
   }, []);
 
-  // FUNCIONES PARA PRODUCTOS
   const getName = (p) => p.name || p.nombre || "Producto";
   const getPrice = (p) => p.price || p.precio || 0;
   const getCat = (p) => p.category || p.categoria || "Sin categoría";
@@ -267,7 +275,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
     }
   }, [isRefreshing]);
 
-  // 🔥🔥🔥 CORRECCIÓN CRÍTICA: FUNCIÓN DE CÁLCULO CORREGIDA
   const calcularEstadisticasCompletas = (ventasPorDia) => {
     let totalVentas = 0;
     let efectivoRecaudado = 0;
@@ -280,7 +287,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
       totalVentas += total;
       ventasCount++;
       
-      // 🔥 LÓGICA CORREGIDA PARA PAGOS MIXTOS
       switch(venta.metodo) {
         case 'efectivo':
           efectivoRecaudado += total;
@@ -289,7 +295,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
           nequiRecaudado += total;
           break;
         case 'mixto':
-          // Usar campos específicos si existen
           efectivoRecaudado += parseFloat(venta.efectivo) || 0;
           nequiRecaudado += parseFloat(venta.nequi) || 0;
           break;
@@ -300,9 +305,8 @@ const AdminReportes = ({ usuario, onLogout }) => {
       totalDomicilios += parseFloat(venta.domicilio) || 0;
     });
     
-    // 🔥 CÁLCULOS FINALES CORRECTOS
-    const saldoCaja = baseCaja + efectivoRecaudado; // Solo efectivo suma a la caja
-    const gananciaDia = totalVentas; // Las ventas totales son la ganancia del día
+    const saldoCaja = baseCaja + efectivoRecaudado;
+    const gananciaDia = totalVentas;
     const promedioVenta = ventasCount > 0 ? totalVentas / ventasCount : 0;
     const totalProductos = totalVentas - totalDomicilios;
     
@@ -320,7 +324,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
     };
   };
 
-  // FILTRAR VENTAS POR FECHA
   const ventasPorDia = ventas.filter((v) => {
     try {
       if (!v.fecha) return false;
@@ -340,7 +343,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
     }
   });
 
-  // 🔥 USAR LA FUNCIÓN CORREGIDA
   const estadisticas = calcularEstadisticasCompletas(ventasPorDia);
 
   const abrirCaja = async () => {
@@ -421,7 +423,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
     }
   };
 
-  // FUNCIONES DE FIADOS
   const calcularSubtotalProductos = () => {
     return productosFiado.reduce((total, prod) => {
       return total + (getPrice(prod) * (prod.cantidad || 1));
@@ -599,12 +600,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
     setShowDetalleFiado(true);
   };
 
-  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA 🔥🔥🔥
-  const handleLogout = () => {
-    localStorage.removeItem('reportes_usuario');
-    window.location.href = '/la-perrada-pos/reportes';
-  };
-
   const formatearHora = (fecha) => {
     return fecha.toLocaleTimeString('es-CO', {
       hour: '2-digit',
@@ -751,7 +746,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
         
         <div className="user-info">
           <span>👤 {usuario?.nombre || 'Administrador'}</span>
-          {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO 🔥🔥🔥 */}
+          {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO Y FUNCIONAL 🔥🔥🔥 */}
           <button onClick={handleLogout} className="logout-btn">
             Cerrar Sesión
           </button>
@@ -771,7 +766,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
               <label className="block font-semibold text-gray-700 mb-2">
                 Seleccionar fecha para filtrar reportes:
               </label>
-              {/* INPUT DE FECHA NUNCA DESHABILITADO */}
               <input
                 type="date"
                 className="w-full border-2 border-blue-300 p-3 rounded-xl text-lg bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
@@ -780,7 +774,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
                   const nuevaFecha = e.target.value;
                   setFechaSeleccionada(nuevaFecha);
                   
-                  // Guardar en Firebase y localStorage
                   syncStorage.setItem("fechaActiva", nuevaFecha).catch(console.error);
                   localStorage.setItem("fechaActiva", nuevaFecha);
                   refrescarDatos();
@@ -826,7 +819,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
         </div>
       </div>
 
-      {/* 🔥🔥🔥 KPI CORREGIDOS */}
+      {/* KPI */}
       <div className="kpi-container">
         <div className="kpi-card" onClick={refrescarDatos} style={{ cursor: 'pointer' }}>
           <div className="kpi-label">VENTAS TOTALES</div>
@@ -864,7 +857,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
         </div>
       </div>
 
-      {/* 🔥🔥🔥 RESUMEN FINANCIERO CORREGIDO */}
+      {/* RESUMEN FINANCIERO */}
       <div className="section-card">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <span className="text-green-600">💰</span>

@@ -1,4 +1,4 @@
-// src/pages/reportes/GersonReportes.jsx - VERSIÓN 100% CORREGIDA
+// src/pages/reportes/GersonReportes.jsx - VERSIÓN COMPLETA CORREGIDA
 import React, { useState, useEffect, useCallback } from 'react';
 import './ReportesComunes.css';
 import products from "../../data/products.js";
@@ -35,6 +35,20 @@ const GersonReportes = ({ usuario, onLogout }) => {
     celular: "",
     fechaFiado: "",
   });
+
+  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA Y FUNCIONAL 🔥🔥🔥
+  const handleLogout = () => {
+    // Limpiar todo
+    localStorage.removeItem('reportes_usuario');
+    localStorage.removeItem('fechaActiva');
+    localStorage.removeItem('estadoCaja');
+    
+    // Forzar recarga completa
+    setTimeout(() => {
+      window.location.href = window.location.origin + '/la-perrada-pos/reportes';
+      window.location.reload(true);
+    }, 50);
+  };
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -899,12 +913,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
     setShowDetalleFiado(true);
   };
 
-  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA 🔥🔥🔥
-  const handleLogout = () => {
-    localStorage.removeItem('reportes_usuario');
-    window.location.href = '/la-perrada-pos/reportes';
-  };
-
   const formatearHora = (fecha) => {
     return fecha.toLocaleTimeString('es-CO', {
       hour: '2-digit',
@@ -1039,7 +1047,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <span style={{background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)"}}>
             👑 GERENTE: {usuario?.nombre || 'GERSON'}
           </span>
-          {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO 🔥🔥🔥 */}
+          {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO Y FUNCIONAL 🔥🔥🔥 */}
           <button onClick={handleLogout} className="logout-btn">
             Cerrar Sesión
           </button>

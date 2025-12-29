@@ -1,4 +1,4 @@
-// src/pages/POS.jsx - VERSIÓN 100% CORREGIDA CON FECHA AUTOMÁTICA Y SIN GANANCIAS VISIBLES
+// src/pages/POS.jsx - VERSIÓN 100% CORREGIDA
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import products from "../data/products.js";
@@ -12,12 +12,12 @@ export default function POS() {
   const [showMesaPedido, setShowMesaPedido] = useState(false);
   const [mesaSeleccionadaPedido, setMesaSeleccionadaPedido] = useState(null);
   
-  // 🔥 NUEVO: ESTADO PARA FECHA ACTIVA
+  // ESTADO PARA FECHA ACTIVA
   const [fechaActiva, setFechaActiva] = useState(() => {
     return localStorage.getItem("fechaActiva") || "";
   });
   
-  // 🔥 NUEVO: ESTADO PARA ESTADO CAJA
+  // ESTADO PARA ESTADO CAJA
   const [estadoCaja, setEstadoCaja] = useState(() => {
     return localStorage.getItem("estadoCaja") || "cerrada";
   });
@@ -86,7 +86,7 @@ export default function POS() {
     }));
   });
 
-  // 🔥 NUEVO: SINCRONIZAR FECHA Y ESTADO CAJA DESDE FIREBASE
+  // SINCRONIZAR FECHA Y ESTADO CAJA DESDE FIREBASE
   useEffect(() => {
     console.log("📅 POS: Iniciando sincronización de fecha y estado caja...");
     
@@ -143,7 +143,7 @@ export default function POS() {
     };
   }, []);
 
-  // 🔥 SINCRONIZAR MESAS DESDE FIREBASE
+  // SINCRONIZAR MESAS DESDE FIREBASE
   useEffect(() => {
     console.log("🚀 POS: Iniciando sincronización de mesas...");
     
@@ -321,7 +321,17 @@ export default function POS() {
   const getCat = (p) => p.categoria ?? p.category ?? "Sin categoría";
   const getId = (p) => p.id ?? p._id ?? Math.random().toString();
 
-  // 🔥 CORRECCIÓN: GUARDAR MESAS CON FECHA AUTOMÁTICA
+  // FUNCIÓN PARA OBTENER RUTA CORRECTA DEL LOGO
+  const getLogoPath = () => {
+    // Si estamos en desarrollo local
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/logo.png';
+    }
+    // Si estamos en GitHub Pages
+    return '/la-perrada-pos/logo.png';
+  };
+
+  // GUARDAR MESAS CON FECHA AUTOMÁTICA
   const saveMesas = async (nuevasMesas) => {
     console.log("💾 POS: Guardando mesas...");
     
@@ -399,7 +409,7 @@ export default function POS() {
     }
   };
 
-  // 🔥🔥🔥 CORRECCIÓN CRÍTICA: GUARDAR VENTAS CON FECHA AUTOMÁTICA
+  // GUARDAR VENTAS CON FECHA AUTOMÁTICA
   const saveSales = async (nuevasVentas) => {
     try {
       console.log("💰 POS: Guardando ventas con fecha activa:", fechaActiva);
@@ -409,7 +419,7 @@ export default function POS() {
         ...venta,
         // Si no tiene fecha, usar la fecha activa actual
         fecha: venta.fecha || (fechaActiva ? `${fechaActiva}T${new Date().toTimeString().split(' ')[0]}` : new Date().toISOString()),
-        // 🔥 NUEVO: Guardar también la fecha simple para fácil filtrado
+        // Guardar también la fecha simple para fácil filtrado
         fechaSimple: fechaActiva || new Date().toISOString().split('T')[0]
       }));
       
@@ -653,9 +663,9 @@ export default function POS() {
     }
   };
 
-  // 🔥🔥🔥 CORRECCIÓN CRÍTICA: FUNCIÓN COBRAR CON FECHA AUTOMÁTICA
+  // FUNCIÓN COBRAR CON FECHA AUTOMÁTICA
   const abrirModalCobrar = () => {
-    // 🔥 NUEVO: Verificar que haya fecha activa
+    // Verificar que haya fecha activa
     if (!fechaActiva) {
       alert("⚠️ No hay fecha activa seleccionada. Ve a Reportes y selecciona una fecha antes de cobrar.");
       return;
@@ -693,9 +703,9 @@ export default function POS() {
 
   const diferencia = recibidoTotal - totalAPagar;
 
-  // 🔥🔥🔥 CORRECCIÓN CRÍTICA: PROCESAR PAGO CON FECHA AUTOMÁTICA Y PAGOS MIXTOS CORRECTOS
+  // PROCESAR PAGO CON FECHA AUTOMÁTICA Y PAGOS MIXTOS CORRECTOS
   const procesarPago = async () => {
-    // 🔥 VALIDACIÓN ESPECIAL PARA PAGO MIXTO
+    // VALIDACIÓN ESPECIAL PARA PAGO MIXTO
     if (metodoPago === "mixto") {
       if (efectivoNum <= 0 || nequiNum <= 0) {
         alert("❌ Pago mixto requiere montos en AMBOS métodos (efectivo y Nequi)");
@@ -728,10 +738,10 @@ export default function POS() {
       ventas = localStorageSales ? JSON.parse(localStorageSales) : [];
     }
 
-    // 🔥 NUEVO: Crear fecha ISO con la fecha activa
+    // Crear fecha ISO con la fecha activa
     const fechaISO = fechaActiva ? `${fechaActiva}T${new Date().toTimeString().split(' ')[0]}` : new Date().toISOString();
     
-    // 🔥🔥🔥 CORRECCIÓN: Guardar montos específicos para pagos mixtos
+    // CORRECCIÓN: Guardar montos específicos para pagos mixtos
     const nuevaVenta = {
       fecha: fechaISO,
       fechaSimple: fechaActiva,
@@ -740,7 +750,7 @@ export default function POS() {
         : `Mesa ${mesaActual + 1}`,
       total: totalAPagar,
       metodo: metodoPago,
-      // 🔥🔥🔥 IMPORTANTE: Guardar montos específicos por método
+      // IMPORTANTE: Guardar montos específicos por método
       efectivo: metodoPago === "efectivo" ? totalAPagar : 
                 metodoPago === "mixto" ? efectivoNum : 0,
       nequi: metodoPago === "nequi" ? totalAPagar : 
@@ -755,7 +765,7 @@ export default function POS() {
     
     ventas.push(nuevaVenta);
     
-    // 🔥 Guardar ventas usando la función corregida
+    // Guardar ventas usando la función corregida
     await saveSales(ventas);
 
     // GUARDAR EN HISTORIAL DE LA MESA
@@ -767,7 +777,7 @@ export default function POS() {
         : `Mesa ${mesaActual + 1}`,
       total: totalAPagar,
       metodo: metodoPago,
-      // 🔥 También en el historial guardar montos específicos
+      // También en el historial guardar montos específicos
       efectivo: metodoPago === "efectivo" ? totalAPagar : 
                 metodoPago === "mixto" ? efectivoNum : 0,
       nequi: metodoPago === "nequi" ? totalAPagar : 
@@ -978,7 +988,7 @@ export default function POS() {
       ventas = localStorageSales ? JSON.parse(localStorageSales) : [];
     }
 
-    // 🔥 Usar fecha activa
+    // Usar fecha activa
     const fechaISO = fechaActiva ? `${fechaActiva}T${new Date().toTimeString().split(' ')[0]}` : new Date().toISOString();
     
     const nuevaVenta = {
@@ -1153,24 +1163,40 @@ export default function POS() {
 
   return (
     <div className="min-h-screen reportes-container p-4 md:p-6">
-      {/* 🔥 NUEVO: HEADER SIMPLIFICADO - SIN GANANCIAS VISIBLES */}
+      {/* HEADER SIMPLIFICADO */}
       <header className="mb-8">
         <div className="reportes-card text-center p-6 mb-6 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-green-500 to-orange-500"></div>
+          
+          {/* 🔥🔥🔥 LOGO CORREGIDO PARA GITHUB PAGES 🔥🔥🔥 */}
           <img 
-            src="/logo.png" 
+            src={getLogoPath()}
             alt="La Perrada de Piter" 
             className="h-24 md:h-28 mx-auto mb-4 drop-shadow-lg"
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = "https://placehold.co/300x100/667eea/white?text=La+Perrada+de+Piter&font=bold";
+              // Mostrar placeholder si falla
+              e.target.style.display = 'none';
+              const fallback = document.createElement('div');
+              fallback.className = 'flex items-center justify-center w-full h-24 md:h-28 mb-4';
+              fallback.innerHTML = `
+                <div class="text-center">
+                  <div class="text-4xl mb-2">🌭</div>
+                  <div class="text-xl font-bold text-blue-600">La Perrada de Piter</div>
+                </div>
+              `;
+              
+              if (e.target.parentNode) {
+                e.target.parentNode.insertBefore(fallback, e.target.nextSibling);
+              }
             }}
           />
+          
           <h1 className="reportes-title text-3xl md:text-4xl font-black tracking-tight">
             Sistema de Punto de Venta
           </h1>
           
-          {/* 🔥🔥🔥 SIMPLIFICADO: SOLO FECHA ACTIVA Y ESTADO CAJA */}
+          {/* FECHA ACTIVA Y ESTADO CAJA */}
           <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 inline-block">
             <div className="flex items-center gap-2">
               <span className="text-blue-600">📅</span>
@@ -1190,7 +1216,7 @@ export default function POS() {
           
           <p className="text-gray-600 mt-2 font-medium">Gestión profesional de pedidos</p>
           
-          {/* 🔥 ADVERTENCIA SI NO HAY FECHA ACTIVA */}
+          {/* ADVERTENCIA SI NO HAY FECHA ACTIVA */}
           {!fechaActiva && (
             <div className="mt-4 p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
               <div className="flex items-center gap-3">
@@ -1556,7 +1582,7 @@ export default function POS() {
                 </div>
               </div>
               
-              {/* 🔥 INDICADOR DE FECHA EN ORDEN */}
+              {/* INDICADOR DE FECHA EN ORDEN */}
               <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-2">
                   <span className="text-blue-600">📅</span>
@@ -1769,7 +1795,7 @@ export default function POS() {
         </div>
       </div>
 
-      {/* MODALES (se mantienen igual) */}
+      {/* MODALES */}
       {showMesaPedido && mesaSeleccionadaPedido !== null && (
         <div className="modal-overlay">
           <div className="modal-content-large">
@@ -2127,7 +2153,7 @@ export default function POS() {
             </div>
             
             <div className="modal-body">
-              {/* 🔥 INDICADOR DE FECHA EN MODAL DE COBRO */}
+              {/* INDICADOR DE FECHA EN MODAL DE COBRO */}
               <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-2">
                   <span className="text-blue-600">📅</span>
@@ -2520,636 +2546,6 @@ export default function POS() {
           </div>
         </div>
       )}
-
-      {/* ESTILOS CSS */}
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-          backdrop-filter: blur(5px);
-        }
-        
-        .modal-content {
-          width: 420px;
-          background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%);
-          padding: 32px;
-          border-radius: 28px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          backdrop-filter: blur(20px);
-          position: relative;
-          overflow: hidden;
-        }
-        
-        .modal-content-large {
-          width: 520px;
-          background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%);
-          padding: 32px;
-          border-radius: 28px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          backdrop-filter: blur(20px);
-          max-height: 85vh;
-          overflow-y: auto;
-          position: relative;
-        }
-        
-        .modal-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 24px;
-        }
-        
-        .modal-header h3 {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: #1f2937;
-        }
-        
-        .modal-close {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f1f5f9;
-          color: #64748b;
-          border: none;
-          font-size: 1.5rem;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        
-        .modal-close:hover {
-          background: #e2e8f0;
-          color: #475569;
-        }
-        
-        .modal-body {
-          margin-bottom: 24px;
-        }
-        
-        .modal-footer {
-          display: flex;
-          gap: 12px;
-          justify-content: flex-end;
-        }
-        
-        .cobro-total {
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          color: white;
-          padding: 20px;
-          border-radius: 16px;
-          margin-bottom: 24px;
-          text-align: center;
-        }
-        
-        .cobro-total-label {
-          font-size: 0.875rem;
-          opacity: 0.9;
-          margin-bottom: 4px;
-        }
-        
-        .cobro-total-valor {
-          font-size: 2.5rem;
-          font-weight: 800;
-        }
-        
-        .btn {
-          padding: 12px 24px;
-          border-radius: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: none;
-        }
-        
-        .btn-gray {
-          background: #f1f5f9;
-          color: #64748b;
-        }
-        
-        .btn-gray:hover {
-          background: #e2e8f0;
-          color: #475569;
-        }
-        
-        .btn-green {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          color: white;
-        }
-        
-        .btn-green:hover {
-          background: linear-gradient(135deg, #059669 0%, #047857 100%);
-          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-        }
-        
-        .btn-blue {
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          color: white;
-        }
-        
-        .btn-blue:hover {
-          background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-        
-        .btn-orange {
-          background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-          color: white;
-        }
-        
-        .btn-orange:hover {
-          background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
-          box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-        }
-        
-        .modern-input {
-          width: 100%;
-          padding: 12px 16px;
-          border: 2px solid #e5e7eb;
-          border-radius: 12px;
-          font-size: 1rem;
-          transition: all 0.2s;
-        }
-        
-        .modern-input:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        
-        .modern-textarea {
-          width: 100%;
-          padding: 12px 16px;
-          border: 2px solid #e5e7eb;
-          border-radius: 12px;
-          font-size: 1rem;
-          transition: all 0.2s;
-          resize: vertical;
-        }
-        
-        .modern-textarea:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        
-        .order-header {
-          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-          padding: 20px;
-          border-radius: 16px;
-          border: 2px solid #e9ecef;
-        }
-        
-        .stat-card {
-          background: white;
-          border-radius: 12px;
-          padding: 12px;
-          text-align: center;
-          border: 2px solid #e9ecef;
-          transition: all 0.3s;
-        }
-        
-        .stat-card:hover {
-          transform: translateY(-2px);
-          boxShadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        
-        .stat-label {
-          font-size: 11px;
-          color: #6c757d;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          font-weight: 600;
-        }
-        
-        .stat-value {
-          font-size: 20px;
-          font-weight: 800;
-          color: #2b2d42;
-          margin-top: 4px;
-        }
-        
-        .order-item-compact {
-          background: white;
-          border-radius: 12px;
-          padding: 16px;
-          border: 2px solid #e9ecef;
-          transition: all 0.3s;
-        }
-        
-        .order-item-compact:hover {
-          border-color: #4c6ef5;
-          box-shadow: 0 4px 12px rgba(76, 110, 245, 0.1);
-        }
-        
-        .quantity-btn-compact {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          font-weight: bold;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: 2px solid;
-        }
-        
-        .quantity-btn-compact.decrease {
-          background: #f1f3f5;
-          color: #495057;
-          border-color: #dee2e6;
-        }
-        
-        .quantity-btn-compact.decrease:hover {
-          background: #e9ecef;
-          border-color: #adb5bd;
-        }
-        
-        .quantity-btn-compact.increase {
-          background: #d0ebff;
-          color: #1971c2;
-          border-color: #a5d8ff;
-        }
-        
-        .quantity-btn-compact.increase:hover {
-          background: #a5d8ff;
-          border-color: #74c0fc;
-        }
-        
-        .quantity-display-compact {
-          min-width: 40px;
-          text-align: center;
-          font-weight: 800;
-          color: #2b2d42;
-        }
-        
-        .action-btn-compact {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: 2px solid;
-        }
-        
-        .action-btn-compact.has-note {
-          background: #fff3bf;
-          color: #e67700;
-          border-color: #ffd43b;
-        }
-        
-        .action-btn-compact:not(.has-note):not(.delete) {
-          background: #d0ebff;
-          color: #1971c2;
-          border-color: #a5d8ff;
-        }
-        
-        .action-btn-compact.delete {
-          background: #ffe3e3;
-          color: #fa5252;
-          border-color: #ffa8a8;
-        }
-        
-        .action-btn-compact:hover {
-          transform: scale(1.1);
-        }
-        
-        .note-preview {
-          background: linear-gradient(135deg, #fff9db 0%, #ffec99 100%);
-          border-radius: 8px;
-          padding: 10px;
-          border-left: 4px solid #fab005;
-        }
-        
-        .empty-state-order {
-          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-          border-radius: 16px;
-          border: 2px dashed #dee2e6;
-        }
-        
-        .total-final {
-          background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-          padding: 20px;
-          border-radius: 16px;
-          border: 2px solid #e9ecef;
-        }
-        
-        .quick-category-btn {
-          background: white;
-          border: 2px solid #e9ecef;
-          border-radius: 12px;
-          padding: 10px;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-        
-        .quick-category-btn:hover {
-          border-color: #4c6ef5;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(76, 110, 245, 0.1);
-        }
-        
-        .btn-gradient-success {
-          background: linear-gradient(135deg, #40c057 0%, #2f9e44 100%);
-          color: white;
-          border: none;
-          border-radius: 16px;
-          font-weight: 800;
-          padding: 16px;
-          transition: all 0.3s;
-        }
-        
-        .btn-gradient-success:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(64, 192, 87, 0.3);
-        }
-        
-        .btn-gradient-success:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-        
-        .btn-gradient-primary {
-          background: linear-gradient(135deg, #4c6ef5 0%, #3b5bdb 100%);
-          color: white;
-          border: none;
-          border-radius: 16px;
-          font-weight: 800;
-          padding: 12px;
-          transition: all 0.3s;
-        }
-        
-        .btn-gradient-primary:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(76, 110, 245, 0.3);
-        }
-        
-        .btn-gradient-orange {
-          background: linear-gradient(135deg, #ff922b 0%, #e8590c 100%);
-          color: white;
-          border: none;
-          border-radius: 16px;
-          font-weight: 800;
-          padding: 12px;
-          transition: all 0.3s;
-        }
-        
-        .btn-gradient-orange:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(255, 146, 43, 0.3);
-        }
-        
-        .btn-gradient-purple {
-          background: linear-gradient(135deg, #9c36b5 0%, #862e9c 100%);
-          color: white;
-          border: none;
-          border-radius: 16px;
-          font-weight: 800;
-          padding: 12px;
-          transition: all 0.3s;
-        }
-        
-        .btn-gradient-purple:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(156, 54, 181, 0.3);
-        }
-        
-        .btn-gradient-indigo {
-          background: linear-gradient(135deg, #5c7cfa 0%, #4c6ef5 100%);
-          color: white;
-          border: none;
-          border-radius: 16px;
-          font-weight: 800;
-          padding: 12px;
-          transition: all 0.3s;
-        }
-        
-        .btn-gradient-indigo:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(92, 124, 250, 0.3);
-        }
-        
-        .historial-btn {
-          position: absolute;
-          top: 8px;
-          left: 8px;
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-          color: white;
-          border: 2px solid white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          cursor: pointer;
-          z-index: 10;
-          box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-          transition: all 0.3s;
-        }
-        
-        .historial-btn:hover {
-          transform: scale(1.1);
-          box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
-        }
-        
-        .historial-modal {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.8);
-          backdrop-filter: blur(10px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 99999;
-          padding: 20px;
-        }
-        
-        .historial-content {
-          background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-          border-radius: 28px;
-          padding: 32px;
-          width: 100%;
-          max-width: 600px;
-          max-height: 85vh;
-          overflow-y: auto;
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
-          animation: modalAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        @keyframes modalAppear {
-          from {
-            opacity: 0;
-            transform: scale(0.9) translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-        
-        .historial-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 24px;
-          padding-bottom: 16px;
-          border-bottom: 3px solid #e5e7eb;
-        }
-        
-        .historial-header h3 {
-          font-size: 1.75rem;
-          font-weight: 800;
-          color: #1f2937;
-          margin: 0;
-        }
-        
-        .historial-close {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background: #f1f5f9;
-          border: none;
-          font-size: 24px;
-          color: #64748b;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.3s;
-        }
-        
-        .historial-close:hover {
-          background: #e2e8f0;
-          color: #475569;
-          transform: rotate(90deg);
-        }
-        
-        .historial-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        
-        .historial-item {
-          background: white;
-          border-radius: 16px;
-          padding: 20px;
-          border: 2px solid #e5e7eb;
-          transition: all 0.3s;
-        }
-        
-        .historial-item:hover {
-          border-color: #3b82f6;
-          transform: translateX(5px);
-          box-shadow: 0 10px 25px rgba(59, 130, 246, 0.1);
-        }
-        
-        .historial-fecha {
-          font-size: 14px;
-          color: #6b7280;
-          margin-bottom: 8px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        
-        .historial-products {
-          margin-top: 12px;
-        }
-        
-        .historial-product {
-          display: flex;
-          justify-content: space-between;
-          padding: 8px 0;
-          border-bottom: 1px solid #f3f4f6;
-        }
-        
-        .historial-product:last-child {
-          border-bottom: none;
-        }
-        
-        .historial-total {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 2px dashed #e5e7eb;
-          font-weight: 800;
-        }
-        
-        .empty-state {
-          text-align: center;
-          padding: 60px 20px;
-          color: #6b7280;
-        }
-        
-        .empty-state-icon {
-          font-size: 64px;
-          margin-bottom: 20px;
-          opacity: 0.5;
-        }
-        
-        @media (max-width: 1024px) {
-          .total-final {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
-            border: 3px solid #0ea5e9 !important;
-            padding: 20px !important;
-            border-radius: 20px !important;
-            margin-top: 20px !important;
-            box-shadow: 0 10px 25px rgba(14, 165, 233, 0.2) !important;
-          }
-          
-          .total-final .text-3xl {
-            font-size: 32px !important;
-            font-weight: 900 !important;
-            color: #059669 !important;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1) !important;
-          }
-          
-          .xl\\:w-1\\/3 {
-            width: 100% !important;
-            margin-top: 20px;
-          }
-          
-          .summary-final {
-            position: relative !important;
-            z-index: 100 !important;
-          }
-        }
-        
-        .producto-detalle {
-          transition: all 0.3s;
-        }
-        
-        .producto-detalle:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-          border-color: #4c6ef5;
-        }
-      `}</style>
     </div>
   );
 }
