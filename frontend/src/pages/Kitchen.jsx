@@ -1,26 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
-// ✅ IMPORTA SYNCSTORAGE - ESTO ESTÁ CORRECTO
 import syncStorage from "../firebase/storage.js";
+import "../App.css"; // ← AÑADIDO PARA ESTILOS
 
 export default function Kitchen() {
   const [orders, setOrders] = useState([]);
   const [tiempoTranscurrido, setTiempoTranscurrido] = useState({});
   const [notification, setNotification] = useState(null);
+  const [orderCounter, setOrderCounter] = useState(1); // ← CONTADOR GLOBAL
 
   useEffect(() => {
     const loadOrders = async () => {
       try {
-        // ✅ OBTENER DATOS DE FIREBASE - VERSIÓN CORREGIDA
         const saved = await syncStorage.getItem("orders");
         
         let completas;
         
-        // ✅ MANEJAR DIFERENTES FORMATOS DE DATOS
         if (saved && typeof saved === 'object') {
           if (Array.isArray(saved)) {
-            // CASO 1: Firebase devuelve ARRAY
             completas = Array.from({ length: 15 }, (_, i) => {
               return saved[i] || { 
                 items: [], 
@@ -32,9 +29,7 @@ export default function Kitchen() {
               };
             });
           } else {
-            // CASO 2: Firebase devuelve OBJETO (lo normal)
             completas = Array.from({ length: 15 }, (_, i) => {
-              // Buscar en el objeto usando número o string como key
               const mesaData = saved[i] || saved[i.toString()];
               
               if (mesaData && typeof mesaData === 'object') {
@@ -59,7 +54,6 @@ export default function Kitchen() {
             });
           }
         } else {
-          // CASO 3: No hay datos en Firebase
           completas = Array.from({ length: 15 }, (_, i) => ({
             items: [], 
             estado: "vacia", 
@@ -70,38 +64,42 @@ export default function Kitchen() {
           }));
         }
 
-        // ✅ ASIGNAR NÚMEROS DE PEDIDO (TU LÓGICA ORIGINAL)
-        const existingOrderNumbers = new Set();
-        completas.forEach(order => {
-          if (order.pedidoNumero && order.pedidoNumero > 0) {
-            existingOrderNumbers.add(order.pedidoNumero);
+        // ✅ CORRECCIÓN 3: NÚMEROS ÚNICOS POR FECHA/TIMESTAMP
+        // Ordenar por timestamp para asignar números consecutivos
+        const pedidosConTimestamp = completas
+          .map((order, index) => ({ ...order, originalIndex: index }))
+          .filter(order => order.estado === "espera" && order.items?.length > 0)
+          .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+        // Crear mapa de asignación de números
+        const indexToOrderNumber = {};
+        let currentOrderNumber = 1;
+        
+        pedidosConTimestamp.forEach((order) => {
+          if (!order.pedidoNumero || order.pedidoNumero === 0) {
+            indexToOrderNumber[order.originalIndex] = currentOrderNumber;
+            currentOrderNumber++;
+          } else {
+            indexToOrderNumber[order.originalIndex] = order.pedidoNumero;
           }
         });
 
-        let nextNumber = 1;
-        while (existingOrderNumbers.has(nextNumber)) {
-          nextNumber++;
-        }
-
+        // Actualizar números en todas las órdenes
         let changed = false;
-        const updatedOrders = completas.map(order => {
-          if (order.estado === "espera" && order.items?.length > 0 && (!order.pedidoNumero || order.pedidoNumero === 0)) {
+        const updatedOrders = completas.map((order, index) => {
+          const newOrderNumber = indexToOrderNumber[index];
+          
+          if (newOrderNumber && newOrderNumber !== order.pedidoNumero) {
             changed = true;
-            const newOrder = {
+            return {
               ...order,
-              pedidoNumero: nextNumber,
-              timestamp: order.timestamp || Date.now()
+              pedidoNumero: newOrderNumber
             };
-            existingOrderNumbers.add(nextNumber);
-            nextNumber++;
-            return newOrder;
           }
           return order;
         });
 
         if (changed) {
-          // ✅ GUARDAR EN FIREBASE - VERSIÓN CORREGIDA
-          // Convertir array a objeto para Firebase
           const firebaseObject = {};
           updatedOrders.forEach((order, index) => {
             firebaseObject[index] = {
@@ -118,10 +116,12 @@ export default function Kitchen() {
         }
 
         setOrders(updatedOrders);
+        if (currentOrderNumber > 1) {
+          setOrderCounter(currentOrderNumber);
+        }
         
       } catch (error) {
-        console.error("❌ Error cargando pedidos de Firebase:", error);
-        // Fallback a localStorage
+        console.error("❌ Error cargando pedidos:", error);
         try {
           const saved = localStorage.getItem("orders");
           if (saved) {
@@ -138,14 +138,12 @@ export default function Kitchen() {
 
     loadOrders();
     
-    // ✅ SINCRONIZAR EN TIEMPO REAL - VERSIÓN CORREGIDA
     const unsuscribe = syncStorage.syncItem("orders", (newOrders) => {
       if (newOrders !== null && newOrders !== undefined) {
         try {
           let nuevasOrders;
           
           if (Array.isArray(newOrders)) {
-            // Firebase devuelve array
             nuevasOrders = Array.from({ length: 15 }, (_, i) => 
               newOrders[i] || { 
                 items: [], 
@@ -157,7 +155,6 @@ export default function Kitchen() {
               }
             );
           } else if (typeof newOrders === 'object') {
-            // Firebase devuelve objeto
             nuevasOrders = Array.from({ length: 15 }, (_, i) => {
               const mesaData = newOrders[i] || newOrders[i.toString()];
               
@@ -182,23 +179,21 @@ export default function Kitchen() {
               }
             });
           } else {
-            console.warn("Formato de datos inesperado de Firebase:", newOrders);
+            console.warn("Formato de datos inesperado:", newOrders);
             return;
           }
           
           setOrders(nuevasOrders);
-          // También actualizar localStorage para compatibilidad
           localStorage.setItem("orders", JSON.stringify(nuevasOrders));
           
         } catch (error) {
-          console.error("Error procesando datos en tiempo real:", error);
+          console.error("Error procesando datos:", error);
         }
       }
     });
     
-    // Mantener el intervalo para actualizar tiempos
     const interval = setInterval(() => {
-      loadOrders(); // Recargar cada segundo
+      loadOrders();
     }, 1000);
     
     return () => {
@@ -224,12 +219,10 @@ export default function Kitchen() {
 
   const marcarListo = async (index) => {
     try {
-      // ✅ OBTENER DATOS ACTUALES DE FIREBASE - VERSIÓN CORREGIDA
       const saved = await syncStorage.getItem("orders") || {};
       
       let data;
       
-      // Convertir a array de 15 elementos
       if (Array.isArray(saved)) {
         data = Array.from({ length: 15 }, (_, i) => 
           saved[i] || { 
@@ -242,7 +235,6 @@ export default function Kitchen() {
           }
         );
       } else if (typeof saved === 'object') {
-        // Firebase devuelve objeto
         data = Array.from({ length: 15 }, (_, i) => {
           const mesaData = saved[i] || saved[i.toString()];
           
@@ -277,17 +269,13 @@ export default function Kitchen() {
         }));
       }
       
-      // Guardar info para la notificación
       const orderInfo = {
         mesaNumero: data[index].tipo === "domicilio" ? `D${index - 9}` : `M${index + 1}`,
         pedidoNumero: data[index].pedidoNumero
       };
       
-      // Actualizar estado
       data[index].estado = "listo";
       
-      // ✅ GUARDAR EN FIREBASE - VERSIÓN CORREGIDA
-      // Convertir array a objeto para Firebase
       const firebaseObject = {};
       data.forEach((order, i) => {
         firebaseObject[i] = {
@@ -303,15 +291,11 @@ export default function Kitchen() {
       await syncStorage.setItem("orders", firebaseObject);
       
       setOrders(data);
-      
-      // También actualizar localStorage para compatibilidad
       localStorage.setItem("orders", JSON.stringify(data));
       window.dispatchEvent(new Event('storage'));
       
-      // Mostrar notificación
       setNotification(orderInfo);
       
-      // Ocultar después de 3 segundos
       setTimeout(() => {
         setNotification(null);
       }, 3000);
@@ -329,8 +313,8 @@ export default function Kitchen() {
     .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* NOTIFICACIÓN EN EL CENTRO */}
+    <div className="min-h-screen reportes-container p-4 md:p-6">
+      {/* NOTIFICACIÓN */}
       {notification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40"></div>
@@ -344,29 +328,37 @@ export default function Kitchen() {
         </div>
       )}
 
-      {/* HEADER SIMPLE */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-2">
-          <h1 className="text-2xl font-bold text-gray-800">👨‍🍳 Cocina</h1>
-          <Link 
-            to="/" 
-            className="bg-gray-800 text-white px-3 py-1.5 rounded text-sm flex items-center gap-1 hover:bg-gray-900"
-          >
-            ← POS
-          </Link>
+      {/* HEADER - CORREGIDO CON ESTILOS DEL POS */}
+      <header className="mb-8">
+        <div className="reportes-card text-center p-6 mb-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-green-500 to-orange-500"></div>
+          
+          <h1 className="reportes-title text-3xl md:text-4xl font-black tracking-tight mb-2">
+            👨‍🍳 Cocina
+          </h1>
+          
+          <p className="text-gray-600 font-medium">Gestión de pedidos en tiempo real</p>
+          
+          <div className="mt-6">
+            <Link 
+              to="/" 
+              className="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-6 py-2.5 rounded-lg font-bold transition-colors"
+            >
+              ← Volver al POS
+            </Link>
+          </div>
         </div>
-        <p className="text-gray-600">Gestión de pedidos en tiempo real</p>
-      </div>
+      </header>
 
-      {/* CONTENIDO PRINCIPAL */}
+      {/* CONTENIDO PRINCIPAL - ORGANIZADO EN CUADROS */}
       {pedidosEnPreparacion.length === 0 ? (
-        <div className="bg-white rounded-xl p-10 text-center shadow">
-          <div className="text-6xl mb-4">🍽️</div>
+        <div className="reportes-card text-center py-12">
+          <div className="text-gray-300 text-6xl mb-4">🍽️</div>
           <h3 className="text-xl font-semibold text-gray-700 mb-2">No hay pedidos pendientes</h3>
-          <p className="text-gray-500">Los pedidos del POS aparecerán aquí</p>
+          <p className="text-gray-500">Los pedidos del POS aparecerán aquí automáticamente</p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {pedidosEnPreparacion.map((mesa) => {
             const mesaIndex = mesa.originalIndex;
             const tiempo = tiempoTranscurrido[mesaIndex] || { minutos: 0, segundos: 0 };
@@ -374,62 +366,96 @@ export default function Kitchen() {
             const totalItems = mesa.items?.reduce((sum, item) => sum + (item.cantidad || 1), 0) || 0;
             
             return (
-              <div key={mesaIndex} className="bg-white rounded-xl shadow-lg">
-                {/* TÍTULO GRANDE - UN SOLO TÍTULO */}
-                <div className="p-5 bg-gray-800 text-white rounded-t-xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold">
-                        {isDomicilio ? `🚚 D${mesaIndex - 9}` : `🪑 M${mesaIndex + 1}`} 
-                        <span className="text-blue-300 ml-3">Pedido #{mesa.pedidoNumero}</span>
-                      </h2>
-                      <div className="flex items-center gap-4 mt-2 text-gray-300">
-                        <span>{totalItems} producto{totalItems !== 1 ? 's' : ''}</span>
-                        <span>•</span>
-                        <span>⏱️ {tiempo.minutos}:{tiempo.segundos.toString().padStart(2, '0')} min</span>
-                        {isDomicilio && <span className="text-red-300">• Domicilio</span>}
+              // ✅ CORRECCIÓN 1: CUADRO/CARD ORGANIZADO
+              <div key={mesaIndex} className="reportes-card hover:shadow-xl transition-all duration-300">
+                {/* CABECERA DEL PEDIDO */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`icon-card ${isDomicilio ? 'bg-gradient-to-br from-purple-500 to-pink-600' : 'bg-gradient-to-br from-blue-500 to-indigo-600'} text-white`}>
+                        {isDomicilio ? '🚚' : '🪑'}
+                      </div>
+                      <div>
+                        <h2 className="reportes-subtitle">
+                          {isDomicilio ? `Domicilio D${mesaIndex - 9}` : `Mesa M${mesaIndex + 1}`}
+                        </h2>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-sm font-bold text-gray-600">
+                            Pedido #{mesa.pedidoNumero}
+                          </span>
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                            {totalItems} producto{totalItems !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    
                     {mesa.domicilio > 0 && (
                       <div className="text-right">
-                        <div className="text-lg font-bold text-green-300">+${mesa.domicilio}</div>
-                        <div className="text-sm text-gray-300">Domicilio</div>
+                        <div className="text-lg font-bold text-green-600">+${mesa.domicilio.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">Domicilio</div>
                       </div>
                     )}
                   </div>
+                  
+                  {/* TIEMPO Y ESTADO */}
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-blue-600">⏱️</span>
+                        <div>
+                          <div className="font-bold text-blue-800">Tiempo transcurrido</div>
+                          <div className="text-sm text-blue-600">
+                            {tiempo.minutos}:{tiempo.segundos.toString().padStart(2, '0')} minutos
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-gray-600">Estado</div>
+                        <div className="text-green-600 font-bold">🟡 En preparación</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* PRODUCTOS CON VIÑETAS */}
-                <div className="p-5">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Productos:</h3>
+                {/* ✅ CORRECCIÓN 1: PRODUCTOS CON VIÑETAS */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span>📋</span>
+                    Productos del pedido:
+                  </h3>
                   
                   <div className="space-y-3">
                     {mesa.items.map((producto, pIdx) => {
                       const cantidad = producto.cantidad || 1;
+                      const totalProducto = (producto.precio || 0) * cantidad;
+                      
                       return (
-                        <div key={pIdx} className="flex items-start">
-                          <div className="mr-3 mt-1">
-                            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        // ✅ VIÑETA CON PUNTO AZUL
+                        <div key={pIdx} className="flex items-start pl-2">
+                          <div className="mr-3 mt-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-base font-medium text-gray-800">
-                                {producto.nombre}
-                              </span>
-                              {cantidad > 1 && (
-                                <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                                  x{cantidad}
-                                </span>
-                              )}
+                          
+                          <div className="flex-1 producto-card">
+                            <div className="producto-header">
+                              <span className="font-bold text-gray-800">{producto.nombre}</span>
+                              <span className="font-bold text-green-600">${totalProducto.toLocaleString()}</span>
                             </div>
-                            {producto.nota && (
-                              <div className="mt-2 p-3 bg-yellow-50 border-l-3 border-yellow-500 rounded-r">
-                                <div className="flex items-start">
-                                  <span className="text-yellow-600 mr-2">📝</span>
-                                  <span className="text-sm text-yellow-800">{producto.nota}</span>
+                            
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="controles-cantidad">
+                                <div className="text-sm text-gray-600">
+                                  Cantidad: <span className="font-bold">{cantidad}</span>
                                 </div>
                               </div>
-                            )}
+                              
+                              {producto.nota && (
+                                <div className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+                                  📝 {producto.nota}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -437,15 +463,21 @@ export default function Kitchen() {
                   </div>
                 </div>
 
-                {/* BOTÓN */}
-                <div className="p-5 border-t bg-gray-50 rounded-b-xl">
+                {/* ✅ CORRECCIÓN 2: BOTÓN VERDE LLAMATIVO */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
                   <button
                     onClick={() => marcarListo(mesaIndex)}
-                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-lg font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="btn-gradient-success w-full py-3 text-lg font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"
                   >
                     <span className="text-xl">✓</span>
                     MARCAR COMO LISTO
                   </button>
+                  
+                  <div className="text-center mt-3">
+                    <div className="text-xs text-gray-500">
+                      Al marcar como listo, el POS será notificado automáticamente
+                    </div>
+                  </div>
                 </div>
               </div>
             );
@@ -453,12 +485,28 @@ export default function Kitchen() {
         </div>
       )}
 
-      {/* FOOTER */}
+      {/* FOOTER MEJORADO */}
       {pedidosEnPreparacion.length > 0 && (
-        <div className="mt-8 p-4 bg-gray-800 text-white text-center rounded-xl">
-          <div className="text-sm">
-            Mostrando {pedidosEnPreparacion.length} pedido{pedidosEnPreparacion.length !== 1 ? 's' : ''}
-            <span className="text-green-300 ml-2">• Ordenado por antigüedad</span>
+        <div className="reportes-card mt-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="icon-card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                <span>📊</span>
+              </div>
+              <div>
+                <div className="font-bold text-gray-800">
+                  Mostrando {pedidosEnPreparacion.length} pedido{pedidosEnPreparacion.length !== 1 ? 's' : ''}
+                </div>
+                <div className="text-sm text-gray-600">
+                  Ordenados por antigüedad • Más antiguo primero
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <div className="text-sm text-gray-600">Próximo número de pedido</div>
+              <div className="text-2xl font-bold text-blue-600">#{orderCounter}</div>
+            </div>
           </div>
         </div>
       )}

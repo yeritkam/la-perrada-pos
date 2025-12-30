@@ -1,4 +1,3 @@
-// src/pages/reportes/GersonReportes.jsx - VERSIÓN COMPLETA CORREGIDA
 import React, { useState, useEffect, useCallback } from 'react';
 import './ReportesComunes.css';
 import products from "../../data/products.js";
@@ -16,10 +15,10 @@ const GersonReportes = ({ usuario, onLogout }) => {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [showDetalleFiado, setShowDetalleFiado] = useState(false);
   const [fiadoSeleccionado, setFiadoSeleccionado] = useState(null);
-  const [baseCaja, setBaseCaja] = useState(() => {
-    const saved = localStorage.getItem("baseCaja_" + (localStorage.getItem("fechaActiva") || ""));
-    return saved ? parseInt(saved) : 10000;
-  });
+  
+  const [baseCaja, setBaseCaja] = useState(0);
+  const [formattedBase, setFormattedBase] = useState("");
+  
   const [topProductos, setTopProductos] = useState([]);
   const [historialPDFs, setHistorialPDFs] = useState(() => {
     return JSON.parse(localStorage.getItem("historialPDFs") || "[]");
@@ -29,6 +28,13 @@ const GersonReportes = ({ usuario, onLogout }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sincronizacionActiva, setSincronizacionActiva] = useState(false);
   const [ventas, setVentas] = useState([]);
+  // Estados para el modal de marcar fiado como pagado
+  const [showModalPagarFiado, setShowModalPagarFiado] = useState(false);
+  const [fiadoAPagar, setFiadoAPagar] = useState(null);
+  const [fechaPagoFiado, setFechaPagoFiado] = useState("");
+  const [metodoPagoFiado, setMetodoPagoFiado] = useState("efectivo");
+  const [efectivoMixto, setEfectivoMixto] = useState(0);
+  const [nequiMixto, setNequiMixto] = useState(0);
 
   const [nuevoFiado, setNuevoFiado] = useState({
     nombre: "",
@@ -36,21 +42,22 @@ const GersonReportes = ({ usuario, onLogout }) => {
     fechaFiado: "",
   });
 
-  // 🔥🔥🔥 FUNCIÓN LOGOUT CORREGIDA Y FUNCIONAL 🔥🔥🔥
+  useEffect(() => {
+    // Establecer fecha de hoy por defecto para el modal
+    const hoy = new Date().toISOString().split('T')[0];
+    setFechaPagoFiado(hoy);
+  }, []);
+
   const handleLogout = () => {
-    // Limpiar todo
     localStorage.removeItem('reportes_usuario');
     localStorage.removeItem('fechaActiva');
     localStorage.removeItem('estadoCaja');
     
-    // Detectar si estamos en GitHub Pages
     const isGitHubPages = window.location.hostname.includes('github.io');
     const basePath = isGitHubPages ? '/la-perrada-pos' : '';
     
-    // Redirigir a la página de login
     window.location.href = basePath + '/reportes';
     
-    // Forzar recarga completa si no redirige
     setTimeout(() => {
       window.location.reload(true);
     }, 100);
@@ -61,7 +68,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
       try {
         console.log("📥 GersonReportes: Cargando datos iniciales...");
         
-        // FECHA ACTIVA - CORREGIDO
         const fecha = await syncStorage.getItem("fechaActiva");
         console.log("📅 Fecha cargada de Firebase:", fecha);
         
@@ -73,7 +79,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
           setFechaSeleccionada(fechaLocal);
         }
         
-        // ESTADO CAJA
         const estado = await syncStorage.getItem("estadoCaja");
         if (estado !== null && estado !== undefined) {
           setEstadoCaja(estado);
@@ -81,7 +86,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
           setEstadoCaja(localStorage.getItem("estadoCaja") || "cerrada");
         }
         
-        // FIADOS
         const fiadosData = await syncStorage.getItem("fiados");
         console.log("📦 Fiados cargados:", fiadosData, "Tipo:", typeof fiadosData);
         
@@ -103,7 +107,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
           }
         }
         
-        // VENTAS
         const ventasData = await syncStorage.getItem("sales");
         console.log("📊 Ventas cargadas:", ventasData, "Tipo:", typeof ventasData);
         
@@ -149,7 +152,22 @@ const GersonReportes = ({ usuario, onLogout }) => {
 
     loadInitialData();
 
-    // LISTENERS EN TIEMPO REAL
+    const loadBaseFromFirebase = async () => {
+      try {
+        const baseData = await syncStorage.getItem("baseCaja");
+        if (baseData && typeof baseData === 'object' && baseData.fecha === fechaSeleccionada) {
+          setBaseCaja(baseData.monto || 0);
+          setFormattedBase(formatNumber(baseData.monto || 0));
+        }
+      } catch (error) {
+        console.error("Error cargando base de Firebase:", error);
+      }
+    };
+
+    if (fechaSeleccionada) {
+      loadBaseFromFirebase();
+    }
+
     const unsubscribeFecha = syncStorage.syncItem("fechaActiva", (newFecha) => {
       console.log("🔄 Sincronización fecha activa:", newFecha);
       if (newFecha !== null && newFecha !== undefined) {
@@ -202,16 +220,27 @@ const GersonReportes = ({ usuario, onLogout }) => {
       }
     });
 
+    const unsubscribeBase = syncStorage.syncItem("baseCaja", (newBaseData) => {
+      console.log("🔄 Gerson: Sincronización base recibida:", newBaseData);
+      
+      if (newBaseData && typeof newBaseData === 'object' && newBaseData.fecha === fechaSeleccionada) {
+        setBaseCaja(newBaseData.monto || 0);
+        setFormattedBase(formatNumber(newBaseData.monto || 0));
+        setRefreshKey(prev => prev + 1);
+        console.log("✅ Base actualizada desde sincronización:", newBaseData.monto);
+      }
+    });
+
     return () => {
       console.log("🧹 Limpiando listeners de GersonReportes.jsx");
       unsubscribeFecha?.();
       unsubscribeEstado?.();
       unsubscribeFiados?.();
       unsubscribeVentas?.();
+      unsubscribeBase?.();
     };
-  }, []);
+  }, [fechaSeleccionada]);
 
-  // FUNCIONES PARA PRODUCTOS
   const getName = (p) => p.name || p.nombre || "Producto";
   const getPrice = (p) => p.price || p.precio || 0;
   const getCat = (p) => p.category || p.categoria || "Sin categoría";
@@ -294,60 +323,74 @@ const GersonReportes = ({ usuario, onLogout }) => {
     }
   }, [isRefreshing]);
 
-  // 🔥🔥🔥 CORRECCIÓN CRÍTICA: FUNCIÓN DE CÁLCULO CORREGIDA
+  // ✅ CORRECCIÓN 1: FUNCIÓN DE CÁLCULO REEMPLAZADA
   const calcularEstadisticasCompletas = (ventasPorDia) => {
     let totalVentas = 0;
     let efectivoRecaudado = 0;
     let nequiRecaudado = 0;
     let totalDomicilios = 0;
     let ventasCount = 0;
+    let totalProductos = 0;
     
     ventasPorDia.forEach(venta => {
-      const total = parseFloat(venta.total) || 0;
-      totalVentas += total;
-      ventasCount++;
+      const totalVenta = parseInt(venta.total) || 0;
+      const domicilio = parseInt(venta.domicilio) || 0;
       
-      // 🔥 LÓGICA CORREGIDA PARA PAGOS MIXTOS
-      switch(venta.metodo) {
-        case 'efectivo':
-          efectivoRecaudado += total;
-          break;
-        case 'nequi':
-          nequiRecaudado += total;
-          break;
-        case 'mixto':
-          // Usar campos específicos si existen
-          efectivoRecaudado += parseFloat(venta.efectivo) || 0;
-          nequiRecaudado += parseFloat(venta.nequi) || 0;
-          break;
-        default:
-          break;
+      // ✅ CORRECCIÓN: TRATAR FIADOS DIFERENTE
+      if (venta.tipo === "fiado") {
+        // Para fiados: totalVenta YA INCLUYE domicilio
+        totalVentas += totalVenta;
+        totalProductos += totalVenta - domicilio; // Restar domicilio para productos puros
+        // ❌ NO sumar domicilio a totalDomicilios (no es domicilio del día)
+      } else {
+        // Para ventas normales: sumar domicilio aparte
+        const totalReal = totalVenta + domicilio;
+        totalVentas += totalReal;
+        totalDomicilios += domicilio;  // ✅ Solo domicilios NORMALES del día
+        totalProductos += totalVenta;
       }
       
-      totalDomicilios += parseFloat(venta.domicilio) || 0;
+      ventasCount++;
+      
+      // Cálculo de métodos de pago (igual para todos)
+      const totalAPagar = (venta.tipo === "fiado") ? totalVenta : (totalVenta + domicilio);
+      
+      switch(venta.metodo) {
+        case 'efectivo':
+          efectivoRecaudado += totalAPagar;
+          break;
+        case 'nequi':
+          nequiRecaudado += totalAPagar;
+          break;
+        case 'mixto':
+          if (venta.efectivo !== undefined && venta.nequi !== undefined) {
+            efectivoRecaudado += parseInt(venta.efectivo) || 0;
+            nequiRecaudado += parseInt(venta.nequi) || 0;
+          } else {
+            efectivoRecaudado += Math.round(totalAPagar / 2);
+            nequiRecaudado += Math.round(totalAPagar / 2);
+          }
+          break;
+        default:
+          efectivoRecaudado += totalAPagar;
+          break;
+      }
     });
     
-    // 🔥 CÁLCULOS FINALES CORRECTOS
-    const saldoCaja = baseCaja + efectivoRecaudado; // Solo efectivo suma a la caja
-    const gananciaDia = totalVentas; // Las ventas totales son la ganancia del día
-    const promedioVenta = ventasCount > 0 ? totalVentas / ventasCount : 0;
-    const totalProductos = totalVentas - totalDomicilios;
-    
     return {
-      totalVentas,
-      totalProductos,
-      efectivoRecaudado,
-      nequiRecaudado,
-      totalDomicilios,
-      saldoCaja,
-      gananciaDia,
-      promedioVenta,
+      totalVentas: Math.round(totalVentas),
+      totalProductos: Math.round(totalProductos),
+      efectivoRecaudado: Math.round(efectivoRecaudado),
+      nequiRecaudado: Math.round(nequiRecaudado),
+      totalDomicilios: Math.round(totalDomicilios),
+      saldoCaja: Math.round(baseCaja + efectivoRecaudado),
+      gananciaDia: Math.round(totalVentas),
+      promedioVenta: ventasCount > 0 ? Math.round(totalVentas / ventasCount) : 0,
       ventasCount,
-      baseCaja
+      baseCaja: Math.round(baseCaja)
     };
   };
 
-  // FILTRAR VENTAS POR FECHA
   const ventasPorDia = ventas.filter((v) => {
     try {
       if (!v.fecha) return false;
@@ -367,10 +410,8 @@ const GersonReportes = ({ usuario, onLogout }) => {
     }
   });
 
-  // 🔥 USAR LA FUNCIÓN CORREGIDA
   const estadisticas = calcularEstadisticasCompletas(ventasPorDia);
 
-  // TOP PRODUCTOS
   useEffect(() => {
     if (ventasPorDia.length > 0) {
       const productosMap = {};
@@ -400,7 +441,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
     }
   }, [ventasPorDia, refreshKey]);
 
-  // FUNCIONES DE CAJA
   const abrirCaja = async () => {
     if (!fechaSeleccionada) {
       alert("⚠ Selecciona una fecha antes de abrir caja.");
@@ -439,7 +479,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
       total: estadisticas.totalVentas,
       productos: estadisticas.totalProductos,
       domicilio: estadisticas.totalDomicilios,
-      cantDomicilios: ventasPorDia.filter(v => v.domicilio > 0).length,
+      cantDomicilios: ventasPorDia.filter(v => v.domicilio > 0 && v.tipo !== "fiado").length,
       efectivo: estadisticas.efectivoRecaudado,
       nequi: estadisticas.nequiRecaudado,
       mixto: ventasPorDia.filter(s => s.metodo === "mixto").length,
@@ -479,14 +519,56 @@ const GersonReportes = ({ usuario, onLogout }) => {
     }
   };
 
-  const guardarBaseCaja = () => {
+  const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const handleBaseChange = (e) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    const num = parseInt(numericValue) || 0;
+    
+    setBaseCaja(num);
+    setFormattedBase(formatNumber(num));
+  };
+
+  const setBaseRapida = (monto) => {
+    setBaseCaja(monto);
+    setFormattedBase(formatNumber(monto));
+  };
+
+  const guardarBaseCaja = async () => {
     if (!fechaSeleccionada) {
       alert("Selecciona una fecha primero");
       return;
     }
+    
+    if (baseCaja <= 0) {
+      alert("⚠️ La base de caja debe ser mayor a $0");
+      return;
+    }
+    
     localStorage.setItem("baseCaja_" + fechaSeleccionada, baseCaja.toString());
-    alert(`💰 Base de caja guardada: $${baseCaja.toLocaleString()}`);
-    refrescarDatos();
+    
+    try {
+      const baseData = {
+        fecha: fechaSeleccionada,
+        monto: baseCaja,
+        usuario: usuario?.nombre || 'GERSON',
+        timestamp: new Date().toISOString()
+      };
+      
+      await syncStorage.setItem("baseCaja", baseData);
+      console.log("✅ Base guardada en Firebase para sincronización:", baseData);
+      
+      alert(`💰 Base de caja guardada y sincronizada: $${baseCaja.toLocaleString()}\n\n✅ Admin verá esta base automáticamente.`);
+      refrescarDatos();
+      
+    } catch (error) {
+      console.error("❌ Error guardando base en Firebase:", error);
+      alert(`💰 Base de caja guardada localmente: $${baseCaja.toLocaleString()}\n⚠️ No se pudo sincronizar con Admin (modo offline)`);
+      refrescarDatos();
+    }
   };
 
   const eliminarVenta = async (index) => {
@@ -533,7 +615,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
       return;
     }
 
-    const headers = ["Fecha", "Cliente", "Método", "Total", "Efectivo", "Nequi", "Domicilio", "Productos"];
+    const headers = ["Fecha", "Cliente", "Tipo", "Método", "Total", "Efectivo", "Nequi", "Domicilio", "Productos"];
     let csv = headers.join(",") + "\n";
 
     ventasPorDia.forEach((venta, index) => {
@@ -544,6 +626,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
       const row = [
         venta.fecha?.split('T')[0] || fechaSeleccionada,
         `"${venta.mesa || "Sin nombre"}"`,
+        venta.tipo || "normal",
         venta.metodo,
         venta.total,
         venta.efectivo || 0,
@@ -680,7 +763,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <div class="section">
             <h2>📈 ESTADÍSTICAS</h2>
             <p>Total de ventas: ${estadisticas.ventasCount}</p>
-            <p>Domicilios entregados: ${ventasPorDia.filter(v => v.domicilio > 0).length}</p>
+            <p>Domicilios entregados: ${ventasPorDia.filter(v => v.domicilio > 0 && v.tipo !== "fiado").length}</p>
             <p>Promedio por venta: $${Math.round(estadisticas.promedioVenta).toLocaleString()}</p>
           </div>
           
@@ -741,7 +824,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
     }
   };
 
-  // FUNCIONES FIADOS
   const calcularSubtotalProductos = () => {
     return productosFiado.reduce((total, prod) => {
       return total + (getPrice(prod) * (prod.cantidad || 1));
@@ -851,32 +933,69 @@ const GersonReportes = ({ usuario, onLogout }) => {
     }
   };
 
-  const marcarAlDia = async (fiado) => {
-    const fechaPago = prompt("📅 Ingresa la fecha en que PAGÓ (AAAA-MM-DD):");
+  // 🔧 CORRECCIÓN 2: FUNCIÓN marcarAlDia MODIFICADA (NO prompt - usa modal)
+  const marcarAlDia = (fiado) => {
+    // Abrir modal en lugar de usar prompt
+    setFiadoAPagar(fiado);
+    setFechaPagoFiado(new Date().toISOString().split('T')[0]); // Fecha de hoy por defecto
+    setMetodoPagoFiado("efectivo");
+    setEfectivoMixto(0);
+    setNequiMixto(0);
+    setShowModalPagarFiado(true);
+  };
 
-    if (!fechaPago) {
+  // 🔧 CORRECCIÓN 2: NUEVA FUNCIÓN para procesar el pago desde el modal
+  const procesarPagoFiado = async () => {
+    if (!fiadoAPagar) return;
+    
+    if (!fechaPagoFiado) {
       alert("Debes ingresar una fecha válida.");
       return;
     }
-
+    
+    // Variables para mixto
+    let efectivo = 0;
+    let nequi = 0;
+    let metodoPago = metodoPagoFiado;
+    
+    if (metodoPago === 'mixto') {
+      efectivo = efectivoMixto || 0;
+      nequi = nequiMixto || 0;
+      
+      // Validar que sumen el total
+      if (efectivo + nequi !== fiadoAPagar.valor) {
+        alert(`⚠️ Los montos no suman el total ($${fiadoAPagar.valor.toLocaleString()}).\n\n` +
+              `Efectivo: $${efectivo.toLocaleString()}\n` +
+              `Nequi: $${nequi.toLocaleString()}\n` +
+              `Total: $${(efectivo + nequi).toLocaleString()}\n\n` +
+              `Por favor, ingresa montos que sumen exactamente $${fiadoAPagar.valor.toLocaleString()}`);
+        return;
+      }
+    }
+    
+    // Crear nueva venta con el método correcto
     const nuevaVenta = {
-      mesa: "Fiado - " + fiado.nombre,
-      total: fiado.valor,
-      metodo: "efectivo",
-      fecha: fechaPago + "T12:00:00",
-      domicilio: fiado.domicilio || 0,
+      mesa: "Fiado - " + fiadoAPagar.nombre,
+      total: fiadoAPagar.valor,
+      metodo: metodoPago,
+      fecha: fechaPagoFiado + "T12:00:00",
+      domicilio: fiadoAPagar.domicilio || 0,
       tipo: "fiado",
-      items: fiado.items || []
+      items: fiadoAPagar.items || []
     };
-
+    
+    // Agregar campos específicos para mixto
+    if (metodoPago === 'mixto') {
+      nuevaVenta.efectivo = efectivo;
+      nuevaVenta.nequi = nequi;
+    }
+    
     const nuevasVentas = [...ventas, nuevaVenta];
     const actualizados = fiados.map((f) =>
-      f.id === fiado.id ? { ...f, estado: "aldia", fechaPago } : f
+      f.id === fiadoAPagar.id ? { ...f, estado: "aldia", fechaPago: fechaPagoFiado } : f
     );
-
+    
     try {
-      console.log("✅ Marcando fiado como pagado:", fiado.id);
-      
       await syncStorage.setItem("sales", nuevasVentas);
       await syncStorage.setItem("fiados", actualizados);
       
@@ -888,11 +1007,14 @@ const GersonReportes = ({ usuario, onLogout }) => {
       
       setRefreshKey(prev => prev + 1);
       setUltimaActualizacion(new Date());
-
+      
+      // Generar PDF si está disponible
       try {
         const fiadoPagado = {
-          ...fiado,
-          fechaPago
+          ...fiadoAPagar,
+          fechaPago: fechaPagoFiado,
+          metodoPago,
+          ...(metodoPago === 'mixto' && { efectivo, nequi })
         };
         
         if (PDFGenerator && typeof PDFGenerator.generarFacturaFiado === 'function') {
@@ -901,8 +1023,19 @@ const GersonReportes = ({ usuario, onLogout }) => {
       } catch (error) {
         console.warn("No se pudo generar PDF del fiado:", error);
       }
-
-      alert("✅ Fiado marcado como pagado, sumado a las ventas y factura PDF generada.");
+      
+      alert(`✅ Fiado marcado como pagado:\n\n` +
+            `Cliente: ${fiadoAPagar.nombre}\n` +
+            `Método: ${metodoPago.toUpperCase()}\n` +
+            `Total: $${fiadoAPagar.valor.toLocaleString()}\n` +
+            `${metodoPago === 'mixto' ? `Efectivo: $${efectivo.toLocaleString()}\nNequi: $${nequi.toLocaleString()}\n` : ''}` +
+            `Fecha: ${fechaPagoFiado}\n\n` +
+            `Sumado a las ventas del ${fechaPagoFiado}`);
+      
+      // Cerrar modal
+      setShowModalPagarFiado(false);
+      setFiadoAPagar(null);
+      
     } catch (error) {
       console.error("❌ Error marcando fiado:", error);
       localStorage.setItem("sales", JSON.stringify(nuevasVentas));
@@ -911,6 +1044,8 @@ const GersonReportes = ({ usuario, onLogout }) => {
       setFiados(actualizados);
       
       alert("✅ Fiado marcado como pagado (modo offline).");
+      setShowModalPagarFiado(false);
+      setFiadoAPagar(null);
     }
   };
 
@@ -939,6 +1074,16 @@ const GersonReportes = ({ usuario, onLogout }) => {
       });
     } catch {
       return fechaStr;
+    }
+  };
+
+  // Función para calcular valores de mixto automáticamente
+  const calcularMixto = () => {
+    if (fiadoAPagar && metodoPagoFiado === 'mixto') {
+      const total = fiadoAPagar.valor;
+      const mitad = Math.round(total / 2);
+      setEfectivoMixto(mitad);
+      setNequiMixto(total - mitad);
     }
   };
 
@@ -1057,7 +1202,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <span style={{background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)"}}>
             👑 GERENTE: {usuario?.nombre || 'GERSON'}
           </span>
-          {/* 🔥🔥🔥 BOTÓN LOGOUT CORREGIDO Y FUNCIONAL 🔥🔥🔥 */}
           <button onClick={handleLogout} className="logout-btn">
             Cerrar Sesión
           </button>
@@ -1073,14 +1217,50 @@ const GersonReportes = ({ usuario, onLogout }) => {
         
         <div className="base-caja-container">
           <div className="flex gap-3 items-center">
-            <input
-              type="number"
-              className="input-field"
-              placeholder="Monto inicial de caja"
-              value={baseCaja}
-              onChange={(e) => setBaseCaja(parseInt(e.target.value) || 10000)}
-              style={{maxWidth: "300px"}}
-            />
+            <div className="space-y-3">
+              <div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="input-field"
+                  placeholder="Ej: 50.000"
+                  value={formattedBase}
+                  onChange={handleBaseChange}
+                  style={{maxWidth: "300px", fontSize: "18px"}}
+                />
+                <div className="text-xs text-gray-500 mt-1">
+                  💡 Usa el teclado numérico en móvil
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <button 
+                  onClick={() => setBaseRapida(10000)}
+                  className={`px-3 py-2 rounded-lg ${baseCaja === 10000 ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'}`}
+                >
+                  $10.000
+                </button>
+                <button 
+                  onClick={() => setBaseRapida(50000)}
+                  className={`px-3 py-2 rounded-lg ${baseCaja === 50000 ? 'bg-green-600 text-white' : 'bg-green-100 text-green-800'}`}
+                >
+                  $50.000
+                </button>
+                <button 
+                  onClick={() => setBaseRapida(100000)}
+                  className={`px-3 py-2 rounded-lg ${baseCaja === 100000 ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-800'}`}
+                >
+                  $100.000
+                </button>
+                <button 
+                  onClick={() => setBaseRapida(0)}
+                  className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
             
             <button
               onClick={guardarBaseCaja}
@@ -1092,16 +1272,22 @@ const GersonReportes = ({ usuario, onLogout }) => {
           </div>
           
           {baseCaja > 0 && (
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="font-bold text-blue-700">Base de caja guardada:</div>
-                  <div className="text-2xl font-bold text-blue-900">${baseCaja.toLocaleString()}</div>
+                  <div className="font-bold text-green-700">✅ Base lista para guardar:</div>
+                  <div className="text-2xl font-bold text-green-900">${baseCaja.toLocaleString()}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-600">Para fecha:</div>
                   <div className="font-semibold">{fechaSeleccionada}</div>
                 </div>
+              </div>
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-xs text-blue-800">
+                  💡 <strong>Esta base se sincronizará automáticamente con Admin</strong><br/>
+                  Al guardar, Admin verá inmediatamente: <strong>${baseCaja.toLocaleString()}</strong>
+                </p>
               </div>
             </div>
           )}
@@ -1117,7 +1303,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
               <label className="block font-semibold text-gray-700 mb-2">
                 Fecha para reportes:
               </label>
-              {/* INPUT DE FECHA NUNCA DESHABILITADO */}
               <input
                 type="date"
                 className="w-full border-2 border-blue-300 p-3 rounded-xl text-lg bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
@@ -1176,13 +1361,13 @@ const GersonReportes = ({ usuario, onLogout }) => {
               ⚠️ La caja está ABIERTA. Cierre la caja para cambiar de fecha.
             </p>
             <p className="text-xs text-yellow-600 mt-1">
-              Ventas registradas hoy: ${estadisticas.ventasCount} • Total: ${estadisticas.totalVentas.toLocaleString()}
+              Ventas registradas hoy: ${estadisticas.ventasCount} • Total: $${estadisticas.totalVentas.toLocaleString()}
             </p>
           </div>
         )}
       </div>
 
-      {/* 🔥🔥🔥 KPI CORREGIDOS */}
+      {/* ✅ KPI CORREGIDOS */}
       <div className="kpi-container">
         <div className="kpi-card" onClick={refrescarDatos} style={{ cursor: 'pointer' }}>
           <div className="kpi-label">VENTAS TOTALES</div>
@@ -1215,12 +1400,12 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <div className="kpi-label">GANANCIA DÍA</div>
           <div className="kpi-value">${estadisticas.gananciaDia.toLocaleString()}</div>
           <div className="kpi-trend">
-            {ventasPorDia.filter(v => v.domicilio > 0).length} domicilios
+            {ventasPorDia.filter(v => v.domicilio > 0 && v.tipo !== "fiado").length} domicilios
           </div>
         </div>
       </div>
 
-      {/* 🔥🔥🔥 RESUMEN FINANCIERO CORREGIDO */}
+      {/* 🔥 RESUMEN FINANCIERO CORREGIDO */}
       <div className="section-card gerencia-section resumen-financiero">
         <div className="section-header-gerencia">
           <h2>📊 RESUMEN FINANCIERO COMPLETO (CÁLCULOS CORREGIDOS)</h2>
@@ -1244,8 +1429,11 @@ const GersonReportes = ({ usuario, onLogout }) => {
           </div>
           
           <div className="resumen-item">
-            <div className="resumen-label">Total Domicilios</div>
+            <div className="resumen-label">Total Domicilios (Normales)</div>
             <div className="resumen-value">+${estadisticas.totalDomicilios.toLocaleString()}</div>
+            <div className="text-xs text-gray-500">
+              Excluye domicilios de fiados pagados
+            </div>
           </div>
           
           <div className="border-t pt-4 mt-4">
@@ -1276,7 +1464,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
                 ${estadisticas.gananciaDia.toLocaleString()}
               </div>
               <div className="text-sm text-gray-500 mt-1">
-                (Total de ventas realizadas hoy)
+                (Total de ventas realizadas hoy - incluidos fiados pagados)
               </div>
             </div>
           </div>
@@ -1284,9 +1472,9 @@ const GersonReportes = ({ usuario, onLogout }) => {
         
         <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <p className="text-blue-700 text-sm">
-            💡 <strong>Explicación para Gerencia:</strong> El "Saldo en Caja" es el dinero físico disponible 
-            al final del día (base + efectivo recaudado). La "Ganancia del Día" es el total de ventas realizadas. 
-            Los pagos con Nequi NO suman al saldo en caja, pero sí a la ganancia del día.
+            💡 <strong>Explicación de la corrección:</strong> Los fiados pagados se contabilizan como ventas normales, 
+            pero sus domicilios NO se suman al "Total Domicilios". Solo los domicilios de ventas normales del día 
+            se contabilizan aquí.
           </p>
         </div>
         
@@ -1389,6 +1577,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <div className="ventas-cuadro-container">
             <div className="ventas-cuadro-header">
               <div className="ventas-cuadro-col-cliente">Cliente</div>
+              <div className="ventas-cuadro-col-tipo">Tipo</div>
               <div className="ventas-cuadro-col-metodo">Método</div>
               <div className="ventas-cuadro-col-total">Total</div>
               <div className="ventas-cuadro-col-detalle">Detalle Pago</div>
@@ -1403,6 +1592,14 @@ const GersonReportes = ({ usuario, onLogout }) => {
                     <span className="venta-cuadro-cliente">{venta.mesa || "Sin nombre"}</span>
                     {venta.domicilio > 0 && (
                       <span className="venta-cuadro-domicilio">🚚</span>
+                    )}
+                  </div>
+                  
+                  <div className="ventas-cuadro-col-tipo">
+                    {venta.tipo === "fiado" ? (
+                      <span className="badge badge-purple">Fiado</span>
+                    ) : (
+                      <span className="badge badge-green">Normal</span>
                     )}
                   </div>
                   
@@ -1858,6 +2055,143 @@ const GersonReportes = ({ usuario, onLogout }) => {
                     Marcar como pagado
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔧 CORRECCIÓN 2: MODAL PARA PAGAR FIADO (en lugar de prompt) */}
+      {showModalPagarFiado && fiadoAPagar && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>💳 Marcar Fiado como Pagado</h3>
+              <button
+                onClick={() => {
+                  setShowModalPagarFiado(false);
+                  setFiadoAPagar(null);
+                }}
+                className="modal-close"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="mb-4">
+                <p className="font-bold text-lg">Cliente: {fiadoAPagar.nombre}</p>
+                <p className="text-gray-600">
+                  Total a pagar: <span className="font-bold text-green-600">${fiadoAPagar.valor.toLocaleString()}</span>
+                </p>
+              </div>
+              
+              {/* 🔧 CORRECCIÓN 4: SELECTOR DE FECHA - input type="date" */}
+              <div className="mb-4">
+                <label className="block font-semibold mb-2">📅 Fecha de pago:</label>
+                <input
+                  type="date"
+                  className="w-full border-2 border-blue-300 p-2 rounded-lg"
+                  value={fechaPagoFiado}
+                  onChange={(e) => setFechaPagoFiado(e.target.value)}
+                />
+                <div className="text-xs text-gray-500 mt-1">
+                  Fecha en que el cliente realizó el pago
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block font-semibold mb-2">💳 Método de pago:</label>
+                <div className="flex gap-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPagoFiado("efectivo")}
+                    className={`btn-tipo ${metodoPagoFiado === "efectivo" ? 'btn-tipo-active' : ''}`}
+                  >
+                    💵 Efectivo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPagoFiado("nequi")}
+                    className={`btn-tipo ${metodoPagoFiado === "nequi" ? 'btn-tipo-active' : ''}`}
+                  >
+                    📱 Nequi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMetodoPagoFiado("mixto");
+                      calcularMixto();
+                    }}
+                    className={`btn-tipo ${metodoPagoFiado === "mixto" ? 'btn-tipo-active' : ''}`}
+                  >
+                    🔄 Mixto
+                  </button>
+                </div>
+                
+                {metodoPagoFiado === "mixto" && (
+                  <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">💵 Efectivo:</label>
+                        <input
+                          type="number"
+                          className="w-full border rounded p-2"
+                          value={efectivoMixto}
+                          onChange={(e) => {
+                            const valor = parseInt(e.target.value) || 0;
+                            setEfectivoMixto(valor);
+                            setNequiMixto(fiadoAPagar.valor - valor);
+                          }}
+                          min="0"
+                          max={fiadoAPagar.valor}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">📱 Nequi:</label>
+                        <input
+                          type="number"
+                          className="w-full border rounded p-2"
+                          value={nequiMixto}
+                          onChange={(e) => {
+                            const valor = parseInt(e.target.value) || 0;
+                            setNequiMixto(valor);
+                            setEfectivoMixto(fiadoAPagar.valor - valor);
+                          }}
+                          min="0"
+                          max={fiadoAPagar.valor}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2 text-sm">
+                      <span className="font-semibold">Total: ${(efectivoMixto + nequiMixto).toLocaleString()}</span>
+                      {efectivoMixto + nequiMixto !== fiadoAPagar.valor && (
+                        <span className="text-red-600 ml-2">
+                          ⚠️ Falta: ${(fiadoAPagar.valor - (efectivoMixto + nequiMixto)).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowModalPagarFiado(false);
+                    setFiadoAPagar(null);
+                  }}
+                  className="btn btn-gray"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={procesarPagoFiado}
+                  className="btn btn-green"
+                  disabled={metodoPagoFiado === "mixto" && (efectivoMixto + nequiMixto !== fiadoAPagar.valor)}
+                >
+                  ✅ Confirmar Pago
+                </button>
               </div>
             </div>
           </div>

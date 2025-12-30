@@ -1,9 +1,10 @@
-// src/pages/POS.jsx - VERSIÓN 100% CORREGIDA
+// src/pages/POS.jsx - VERSIÓN FINAL CORREGIDA CON DOMICILIOS FUNCIONALES
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import products from "../data/products.js";
 import PDFGenerator from "../components/PDFGenerator";
 import syncStorage from "../firebase/storage.js";
+import "../App.css";
 
 export default function POS() {
   const [mesaActual, setMesaActual] = useState(null);
@@ -11,6 +12,7 @@ export default function POS() {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [showMesaPedido, setShowMesaPedido] = useState(false);
   const [mesaSeleccionadaPedido, setMesaSeleccionadaPedido] = useState(null);
+  const [showMenuSeleccion, setShowMenuSeleccion] = useState(false);
   
   // ESTADO PARA FECHA ACTIVA
   const [fechaActiva, setFechaActiva] = useState(() => {
@@ -24,8 +26,6 @@ export default function POS() {
 
   // MESAS - VERSIÓN CORREGIDA
   const [mesas, setMesas] = useState(() => {
-    console.log("🔄 POS: Inicializando mesas...");
-    
     try {
       const saved = localStorage.getItem("orders");
       if (saved) {
@@ -68,14 +68,12 @@ export default function POS() {
           };
         });
         
-        console.log("✅ POS: Mesas inicializadas desde localStorage");
         return mesasIniciales;
       }
     } catch (error) {
       console.warn("⚠️ POS: Error cargando mesas de localStorage:", error);
     }
     
-    console.log("📭 POS: Creando 15 mesas vacías por defecto...");
     return Array.from({ length: 15 }, (_, i) => ({
       items: [],
       estado: "vacia",
@@ -88,13 +86,10 @@ export default function POS() {
 
   // SINCRONIZAR FECHA Y ESTADO CAJA DESDE FIREBASE
   useEffect(() => {
-    console.log("📅 POS: Iniciando sincronización de fecha y estado caja...");
-    
     const loadFechaYEstado = async () => {
       try {
         // Cargar fecha activa
         const fechaFirebase = await syncStorage.getItem("fechaActiva");
-        console.log("📅 Fecha de Firebase:", fechaFirebase);
         
         if (fechaFirebase !== null && fechaFirebase !== undefined && fechaFirebase !== "") {
           setFechaActiva(fechaFirebase);
@@ -122,7 +117,6 @@ export default function POS() {
     
     // Listeners en tiempo real
     const unsubscribeFecha = syncStorage.syncItem("fechaActiva", (newFecha) => {
-      console.log("🔄 POS: Cambio en fecha activa:", newFecha);
       if (newFecha !== null && newFecha !== undefined) {
         setFechaActiva(newFecha);
         localStorage.setItem("fechaActiva", newFecha);
@@ -130,7 +124,6 @@ export default function POS() {
     });
     
     const unsubscribeEstado = syncStorage.syncItem("estadoCaja", (newEstado) => {
-      console.log("🔄 POS: Cambio en estado caja:", newEstado);
       if (newEstado !== null && newEstado !== undefined) {
         setEstadoCaja(newEstado);
         localStorage.setItem("estadoCaja", newEstado);
@@ -145,15 +138,12 @@ export default function POS() {
 
   // SINCRONIZAR MESAS DESDE FIREBASE
   useEffect(() => {
-    console.log("🚀 POS: Iniciando sincronización de mesas...");
-    
     let isMounted = true;
     let unsubscribe = null;
     
     const initSync = async () => {
       try {
         const firebaseData = await syncStorage.getItem("orders");
-        console.log("📦 POS: Datos recibidos de Firebase:", firebaseData);
         
         if (!isMounted) return;
         
@@ -191,14 +181,11 @@ export default function POS() {
           if (isMounted) {
             setMesas(nuevasMesas);
             localStorage.setItem("orders", JSON.stringify(nuevasMesas));
-            console.log("✅ POS: Mesas actualizadas desde Firebase");
           }
         }
         
         if (isMounted) {
           unsubscribe = syncStorage.syncItem("orders", (newOrders) => {
-            console.log("📡 POS: Cambio en tiempo real de Firebase");
-            
             if (newOrders !== null && newOrders !== undefined && isMounted) {
               const nuevasMesas = Array.from({ length: 15 }, (_, i) => {
                 let mesaData = null;
@@ -232,7 +219,6 @@ export default function POS() {
               
               setMesas(nuevasMesas);
               localStorage.setItem("orders", JSON.stringify(nuevasMesas));
-              console.log("🔄 POS: Mesas actualizadas desde sincronización en tiempo real");
             }
           });
         }
@@ -245,7 +231,6 @@ export default function POS() {
     initSync();
     
     return () => {
-      console.log("🧹 POS: Limpiando listeners y estado");
       isMounted = false;
       if (unsubscribe && typeof unsubscribe === 'function') {
         unsubscribe();
@@ -254,8 +239,6 @@ export default function POS() {
   }, []);
 
   // HISTORIAL
-  const [historialMesa, setHistorialMesa] = useState(null);
-  const [showHistorial, setShowHistorial] = useState(false);
   const [historialVentas, setHistorialVentas] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('historialVentas')) || {};
@@ -304,7 +287,6 @@ export default function POS() {
   const [editIndex, setEditIndex] = useState(null);
   const [notaTemp, setNotaTemp] = useState("");
   const [showNotaModal, setShowNotaModal] = useState(false);
-  const [showMenuSeleccion, setShowMenuSeleccion] = useState(false);
   const [showDividirCuenta, setShowDividirCuenta] = useState(false);
   const [personasDividir, setPersonasDividir] = useState(2);
   const [productosAsignados, setProductosAsignados] = useState({});
@@ -321,20 +303,16 @@ export default function POS() {
   const getCat = (p) => p.categoria ?? p.category ?? "Sin categoría";
   const getId = (p) => p.id ?? p._id ?? Math.random().toString();
 
-  // 🔥🔥🔥 FUNCIÓN PARA OBTENER RUTA CORRECTA DEL LOGO - CORREGIDA 🔥🔥🔥
+  // 🔥 FUNCIÓN PARA OBTENER RUTA CORRECTA DEL LOGO
   const getLogoPath = () => {
-    // Detectar si estamos en GitHub Pages
     if (window.location.hostname.includes('github.io')) {
       return '/la-perrada-pos/logo.png';
     }
-    // Si estamos en desarrollo local
     return '/logo.png';
   };
 
-  // GUARDAR MESAS CON FECHA AUTOMÁTICA
+  // GUARDAR MESAS
   const saveMesas = async (nuevasMesas) => {
-    console.log("💾 POS: Guardando mesas...");
-    
     try {
       if (!Array.isArray(nuevasMesas)) {
         console.error("❌ POS: nuevasMesas no es un array:", nuevasMesas);
@@ -381,13 +359,10 @@ export default function POS() {
           });
           
           await syncStorage.setItem("orders", firebaseObject);
-          console.log("✅ POS: Mesas guardadas en Firebase");
         }
       } catch (firebaseError) {
         console.warn("⚠️ POS: Error guardando en Firebase, usando solo local:", firebaseError);
       }
-      
-      console.log("✅ POS: Mesas guardadas exitosamente");
       
     } catch (error) {
       console.error("❌ POS: Error crítico en saveMesas:", error);
@@ -409,23 +384,17 @@ export default function POS() {
     }
   };
 
-  // GUARDAR VENTAS CON FECHA AUTOMÁTICA
+  // GUARDAR VENTAS - CORREGIDO PARA INCLUIR DOMICILIO EN EFECTIVO/NEQUI
   const saveSales = async (nuevasVentas) => {
     try {
-      console.log("💰 POS: Guardando ventas con fecha activa:", fechaActiva);
-      
-      // Asegurar que todas las ventas tengan la fecha activa
       const ventasConFecha = nuevasVentas.map(venta => ({
         ...venta,
-        // Si no tiene fecha, usar la fecha activa actual
         fecha: venta.fecha || (fechaActiva ? `${fechaActiva}T${new Date().toTimeString().split(' ')[0]}` : new Date().toISOString()),
-        // Guardar también la fecha simple para fácil filtrado
         fechaSimple: fechaActiva || new Date().toISOString().split('T')[0]
       }));
       
       await syncStorage.setItem("sales", ventasConFecha);
       localStorage.setItem("sales", JSON.stringify(ventasConFecha));
-      console.log("✅ POS: Ventas guardadas con fecha:", fechaActiva);
     } catch (error) {
       console.error("❌ POS: Error guardando ventas:", error);
       localStorage.setItem("sales", JSON.stringify(nuevasVentas));
@@ -564,6 +533,13 @@ export default function POS() {
     }, 0);
   };
 
+  // CORREGIDO: Calcular total incluyendo domicilio
+  const calcularTotalConDomicilio = () => {
+    const subtotalProductos = calcularTotalTemporal();
+    const costoDomicilio = mesaActual !== null ? mesas[mesaActual]?.domicilio || 0 : 0;
+    return subtotalProductos + costoDomicilio;
+  };
+
   // Actualizar nota
   const abrirNota = (idx) => {
     setEditIndex(idx);
@@ -633,39 +609,16 @@ export default function POS() {
     alert(`✅ Pedido enviado a cocina (${calcularProductosUnicos()} productos)`);
   };
 
-  // Calcular total de una mesa
+  // CORREGIDO: Calcular total de una mesa incluyendo domicilio
   const totalMesaEnCocina = (idx) => {
     const mesa = mesas[idx] || { items: [], domicilio: 0 };
     const totalProductos = (mesa.items || []).reduce((s, it) => s + (it.precio * (it.cantidad || 1)), 0);
     const domicilio = mesa.domicilio || 0;
-    return totalProductos + domicilio;
-  };
-
-  // VER HISTORIAL DE MESA
-  const verHistorialMesa = (mesaIndex, e) => {
-    if (e) e.stopPropagation();
-    setHistorialMesa(mesaIndex);
-    setShowHistorial(true);
-  };
-
-  // LIMPIAR HISTORIAL DE MESA
-  const limpiarHistorialMesa = async () => {
-    if (historialMesa !== null) {
-      const nuevoHistorial = { ...historialVentas };
-      delete nuevoHistorial[historialMesa];
-      
-      await saveHistorial(nuevoHistorial);
-      
-      setShowHistorial(false);
-      alert(`✅ Historial limpiado para ${mesas[historialMesa]?.tipo === "domicilio" ? 
-        `Domicilio D${historialMesa - 9}` : 
-        `Mesa M${historialMesa + 1}`}`);
-    }
+    return totalProductos + domicilio; // CORREGIDO: Sumar domicilio al total
   };
 
   // FUNCIÓN COBRAR CON FECHA AUTOMÁTICA
   const abrirModalCobrar = () => {
-    // Verificar que haya fecha activa
     if (!fechaActiva) {
       alert("⚠️ No hay fecha activa seleccionada. Ve a Reportes y selecciona una fecha antes de cobrar.");
       return;
@@ -682,6 +635,7 @@ export default function POS() {
     setOpenCobrar(true);
   };
 
+  // CORREGIDO: Total a pagar incluye domicilio
   const totalAPagar = mesaActual === null ? 0 : totalMesaEnCocina(mesaActual);
 
   const parseNumber = (v) => {
@@ -703,9 +657,8 @@ export default function POS() {
 
   const diferencia = recibidoTotal - totalAPagar;
 
-  // PROCESAR PAGO CON FECHA AUTOMÁTICA Y PAGOS MIXTOS CORRECTOS
+  // PROCESAR PAGO - ✅ CORREGIDO: EFECTIVO/NEQUI INCLUYEN DOMICILIO
   const procesarPago = async () => {
-    // VALIDACIÓN ESPECIAL PARA PAGO MIXTO
     if (metodoPago === "mixto") {
       if (efectivoNum <= 0 || nequiNum <= 0) {
         alert("❌ Pago mixto requiere montos en AMBOS métodos (efectivo y Nequi)");
@@ -722,7 +675,6 @@ export default function POS() {
       return;
     }
 
-    // Cargar ventas existentes
     let ventas = [];
     try {
       const savedSales = await syncStorage.getItem("sales");
@@ -738,66 +690,37 @@ export default function POS() {
       ventas = localStorageSales ? JSON.parse(localStorageSales) : [];
     }
 
-    // Crear fecha ISO con la fecha activa
     const fechaISO = fechaActiva ? `${fechaActiva}T${new Date().toTimeString().split(' ')[0]}` : new Date().toISOString();
     
-    // CORRECCIÓN: Guardar montos específicos para pagos mixtos
+    // Calcular subtotal de productos (sin domicilio)
+    const subtotalProductos = (mesas[mesaActual].items || []).reduce((sum, item) => {
+      return sum + (item.precio * (item.cantidad || 1));
+    }, 0);
+    
+    const domicilio = mesas[mesaActual].domicilio || 0;
+    
+    // ✅ CORREGIDO: Ahora guardamos solo productos en 'total' y efectivo/nequi INCLUYEN DOMICILIO
     const nuevaVenta = {
       fecha: fechaISO,
       fechaSimple: fechaActiva,
       mesa: mesas[mesaActual].tipo === "domicilio" 
         ? `Domicilio ${mesaActual - 9}` 
         : `Mesa ${mesaActual + 1}`,
-      total: totalAPagar,
+      total: subtotalProductos,       // ✅ Solo productos, sin domicilio
+      domicilio: domicilio,           // ✅ Domicilio separado
       metodo: metodoPago,
-      // IMPORTANTE: Guardar montos específicos por método
-      efectivo: metodoPago === "efectivo" ? totalAPagar : 
+      efectivo: metodoPago === "efectivo" ? (subtotalProductos + domicilio) : // ✅ CORREGIDO: Productos + Domicilio
                 metodoPago === "mixto" ? efectivoNum : 0,
-      nequi: metodoPago === "nequi" ? totalAPagar : 
-              metodoPago === "mixto" ? nequiNum : 0,
+      nequi: metodoPago === "nequi" ? (subtotalProductos + domicilio) : // ✅ CORREGIDO: Productos + Domicilio
+             metodoPago === "mixto" ? nequiNum : 0,
       vuelto: diferencia > 0 ? diferencia : 0,
-      domicilio: mesas[mesaActual].domicilio || 0,
       tipo: mesas[mesaActual].tipo || "mesa",
       items: mesas[mesaActual].items || []
     };
     
-    console.log("💰 Guardando venta con datos:", nuevaVenta);
-    
     ventas.push(nuevaVenta);
     
-    // Guardar ventas usando la función corregida
     await saveSales(ventas);
-
-    // GUARDAR EN HISTORIAL DE LA MESA
-    const nuevaVentaHistorial = {
-      id: Date.now(),
-      fecha: fechaISO,
-      mesa: mesas[mesaActual].tipo === "domicilio" 
-        ? `Domicilio ${mesaActual - 9}` 
-        : `Mesa ${mesaActual + 1}`,
-      total: totalAPagar,
-      metodo: metodoPago,
-      // También en el historial guardar montos específicos
-      efectivo: metodoPago === "efectivo" ? totalAPagar : 
-                metodoPago === "mixto" ? efectivoNum : 0,
-      nequi: metodoPago === "nequi" ? totalAPagar : 
-              metodoPago === "mixto" ? nequiNum : 0,
-      vuelto: diferencia > 0 ? diferencia : 0,
-      domicilio: mesas[mesaActual].domicilio || 0,
-      items: mesas[mesaActual].items.map(item => ({
-        ...item,
-        cantidad: item.cantidad || 1
-      }))
-    };
-
-    // Actualizar historial
-    const nuevoHistorial = { ...historialVentas };
-    if (!nuevoHistorial[mesaActual]) {
-      nuevoHistorial[mesaActual] = [];
-    }
-    nuevoHistorial[mesaActual].push(nuevaVentaHistorial);
-    
-    await saveHistorial(nuevoHistorial);
 
     // Generar factura
     const datosFactura = {
@@ -808,12 +731,12 @@ export default function POS() {
       celular: "",
       tipo: mesas[mesaActual].tipo || "mesa",
       fechaVenta: fechaActiva || new Date().toISOString().split('T')[0],
-      valor: totalAPagar,
-      domicilio: mesas[mesaActual].domicilio || 0,
+      valor: subtotalProductos + domicilio, // Para la factura usamos el total completo
+      domicilio: domicilio,
       metodoPago: metodoPago,
-      montoEfectivo: metodoPago === "efectivo" ? totalAPagar : 
+      montoEfectivo: metodoPago === "efectivo" ? (subtotalProductos + domicilio) : // ✅ CORREGIDO
                     metodoPago === "mixto" ? efectivoNum : 0,
-      montoNequi: metodoPago === "nequi" ? totalAPagar : 
+      montoNequi: metodoPago === "nequi" ? (subtotalProductos + domicilio) : // ✅ CORREGIDO
                   metodoPago === "mixto" ? nequiNum : 0,
       vuelto: diferencia > 0 ? diferencia : 0,
       items: mesas[mesaActual].items.map(item => ({
@@ -839,10 +762,12 @@ export default function POS() {
     
     await saveMesas(nuevasMesas);
 
-    // Mostrar confirmación
+    // Mostrar confirmación con desglose
     const mensaje = `✅ Pago registrado exitosamente!\n\n` +
                    `Fecha: ${fechaActiva}\n` +
-                   `Total: $${totalAPagar.toLocaleString()}\n` +
+                   `📦 Productos: $${subtotalProductos.toLocaleString()}\n` +
+                   `🚚 Domicilio: $${domicilio.toLocaleString()}\n` +
+                   `💰 TOTAL: $${(subtotalProductos + domicilio).toLocaleString()}\n` +
                    `Método: ${metodoPago === "efectivo" ? "Efectivo" : 
                               metodoPago === "nequi" ? "Nequi" : 
                               "Mixto (Efectivo + Nequi)"}\n` +
@@ -851,7 +776,6 @@ export default function POS() {
                    `Recibido: $${recibidoTotal.toLocaleString()}\n` +
                    `${diferencia > 0 ? `Vuelto: $${diferencia.toLocaleString()}` : ''}\n\n` +
                    `📄 Factura generada\n` +
-                   `📋 Historial guardado\n` +
                    `✅ Mesa liberada`;
     
     alert(mensaje);
@@ -859,7 +783,7 @@ export default function POS() {
     setMesaActual(null);
   };
 
-  // GENERAR FACTURA DE MESA
+  // GENERAR FACTURA DE MESA - CORREGIDO PARA INCLUIR DOMICILIO
   const generarFacturaMesa = () => {
     if (mesaActual === null) {
       alert("Selecciona una mesa primero");
@@ -872,6 +796,14 @@ export default function POS() {
       return;
     }
 
+    // Calcular subtotal y total con domicilio
+    const subtotalProductos = mesa.items.reduce((sum, item) => {
+      return sum + (item.precio * (item.cantidad || 1));
+    }, 0);
+    
+    const domicilio = mesa.domicilio || 0;
+    const totalConDomicilio = subtotalProductos + domicilio;
+
     const datosFactura = {
       id: Date.now(),
       nombre: mesa.tipo === "domicilio" ? 
@@ -880,8 +812,8 @@ export default function POS() {
       celular: "",
       tipo: mesa.tipo || "mesa",
       fechaVenta: fechaActiva || new Date().toISOString().split('T')[0],
-      valor: totalMesaEnCocina(mesaActual),
-      domicilio: mesa.domicilio || 0,
+      valor: totalConDomicilio,
+      domicilio: domicilio,
       items: mesa.items.map(item => ({
         id: item.id || Math.random(),
         nombre: item.nombre,
@@ -988,7 +920,6 @@ export default function POS() {
       ventas = localStorageSales ? JSON.parse(localStorageSales) : [];
     }
 
-    // Usar fecha activa
     const fechaISO = fechaActiva ? `${fechaActiva}T${new Date().toTimeString().split(' ')[0]}` : new Date().toISOString();
     
     const nuevaVenta = {
@@ -1009,7 +940,6 @@ export default function POS() {
     
     await saveSales(ventas);
     
-    // Generar factura para esta persona
     const datosFactura = {
       id: Date.now(),
       nombre: `Persona ${persona} - ${mesas[mesaActual].tipo === "domicilio" ? 
@@ -1046,34 +976,10 @@ export default function POS() {
     
     alert(`✅ Pago registrado para Persona ${persona}: $${subtotal.toLocaleString()}\n📄 Factura PDF generada`);
     
-    // Verificar si todas las personas han pagado
     const todasPagadas = Array.from({ length: personasDividir }, (_, i) => i + 1)
       .every(p => pagosRealizados[p] || (p === persona));
     
     if (todasPagadas) {
-      const nuevaVentaHistorial = {
-        id: Date.now(),
-        fecha: fechaISO,
-        mesa: mesas[mesaActual].tipo === "domicilio" ? 
-              `Domicilio ${mesaActual - 9}` : 
-              `Mesa ${mesaActual + 1}`,
-        total: totalMesaEnCocina(mesaActual),
-        metodo: "dividido",
-        dividido: true,
-        personas: personasDividir,
-        domicilio: mesas[mesaActual].domicilio || 0,
-        items: mesas[mesaActual].items
-      };
-
-      const nuevoHistorial = { ...historialVentas };
-      if (!nuevoHistorial[mesaActual]) {
-        nuevoHistorial[mesaActual] = [];
-      }
-      nuevoHistorial[mesaActual].push(nuevaVentaHistorial);
-      
-      await saveHistorial(nuevoHistorial);
-
-      // Limpiar la mesa
       const nuevasMesas = [...mesas];
       nuevasMesas[mesaActual] = {
         ...nuevasMesas[mesaActual],
@@ -1099,38 +1005,31 @@ export default function POS() {
 
   // FUNCIONES AUXILIARES
   const getColorPorEstado = (estado) => {
-    let colors;
     if (estado === "vacia") {
-      colors = {
-        bg: "#ffffff",
+      return {
+        gradient: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
         text: "#1f2937",
-        border: "#e5e7eb",
-        gradient: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)"
+        border: "#e5e7eb"
       };
     } else if (estado === "espera") {
-      colors = {
-        bg: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+      return {
+        gradient: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
         text: "#92400e",
-        border: "#fbbf24",
-        gradient: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)"
+        border: "#fbbf24"
       };
     } else if (estado === "listo") {
-      colors = {
-        bg: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)",
+      return {
+        gradient: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)",
         text: "#065f46",
-        border: "#10b981",
-        gradient: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)"
+        border: "#10b981"
       };
     } else {
-      colors = {
-        bg: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)",
+      return {
+        gradient: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)",
         text: "#1e40af",
-        border: "#60a5fa",
-        gradient: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)"
+        border: "#60a5fa"
       };
     }
-    
-    return colors;
   };
 
   const getEstadoTexto = (estado) => {
@@ -1163,34 +1062,35 @@ export default function POS() {
 
   return (
     <div className="min-h-screen reportes-container p-4 md:p-6">
-      {/* HEADER SIMPLIFICADO */}
+      {/* HEADER */}
       <header className="mb-8">
         <div className="reportes-card text-center p-6 mb-6 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-green-500 to-orange-500"></div>
           
-          {/* 🔥🔥🔥 LOGO CORREGIDO PARA GITHUB PAGES 🔥🔥🔥 */}
-          <img 
-            src={getLogoPath()}
-            alt="La Perrada de Piter" 
-            className="h-24 md:h-28 mx-auto mb-4 drop-shadow-lg"
-            onError={(e) => {
-              e.target.onerror = null;
-              // Mostrar placeholder si falla
-              e.target.style.display = 'none';
-              const fallback = document.createElement('div');
-              fallback.className = 'flex items-center justify-center w-full h-24 md:h-28 mb-4';
-              fallback.innerHTML = `
-                <div class="text-center">
-                  <div class="text-4xl mb-2">🌭</div>
-                  <div class="text-xl font-bold text-blue-600">La Perrada de Piter</div>
-                </div>
-              `;
-              
-              if (e.target.parentNode) {
-                e.target.parentNode.insertBefore(fallback, e.target.nextSibling);
-              }
-            }}
-          />
+          {/* LOGO - CON CONTENEDOR PARA CENTRAR CON MÁRGENES */}
+          <div className="logo-header-container mb-4">
+            <img 
+              src={getLogoPath()}
+              alt="La Perrada de Piter" 
+              className="h-24 md:h-28 drop-shadow-lg"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.style.display = 'none';
+                const fallback = document.createElement('div');
+                fallback.className = 'flex items-center justify-center w-full h-24 md:h-28';
+                fallback.innerHTML = `
+                  <div class="text-center">
+                    <div class="text-4xl mb-2">🌭</div>
+                    <div class="text-xl font-bold text-blue-600">La Perrada de Piter</div>
+                  </div>
+                `;
+                
+                if (e.target.parentNode) {
+                  e.target.parentNode.insertBefore(fallback, e.target.nextSibling);
+                }
+              }}
+            />
+          </div>
           
           <h1 className="reportes-title text-3xl md:text-4xl font-black tracking-tight">
             Sistema de Punto de Venta
@@ -1232,7 +1132,7 @@ export default function POS() {
           )}
         </div>
 
-        {/* SELECTOR DE DOMICILIO */}
+        {/* SELECTOR DE DOMICILIO - MEJORADO */}
         {mesaActual !== null && (mesas[mesaActual]?.tipo === "domicilio" || mesaActual >= 10) && (
           <div className="kpi-card mb-6 p-5">
             <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -1240,7 +1140,10 @@ export default function POS() {
                 <div className="icon-card bg-gradient-to-br from-yellow-500 to-orange-500 text-white">
                   <span className="text-xl">🚚</span>
                 </div>
-                <span className="font-bold text-gray-800 text-lg">Precio Domicilio:</span>
+                <div>
+                  <span className="font-bold text-gray-800 text-lg">Costo de Domicilio</span>
+                  <div className="text-sm text-gray-600">Se sumará al total final</div>
+                </div>
               </div>
               <select
                 className="modern-input w-full md:w-48"
@@ -1253,8 +1156,37 @@ export default function POS() {
                 <option value="3000">$3.000</option>
                 <option value="5000">$5.000</option>
               </select>
-              <div className="text-2xl font-black text-green-600 ml-auto">
-                ${(mesas[mesaActual]?.domicilio || 0).toLocaleString()}
+              <div className="flex flex-col items-end ml-auto">
+                <span className="text-2xl font-black text-green-600">
+                  +${(mesas[mesaActual]?.domicilio || 0).toLocaleString()}
+                </span>
+                <div className="text-xs text-gray-500">Costo adicional</div>
+              </div>
+            </div>
+            
+            {/* DESGLOSE DEL TOTAL */}
+            <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm text-gray-600">Subtotal productos:</div>
+                  <div className="text-lg font-bold text-gray-800">
+                    ${calcularTotalTemporal().toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">Domicilio:</div>
+                  <div className="text-lg font-bold text-green-600">
+                    +${(mesas[mesaActual]?.domicilio || 0).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-green-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-bold text-gray-800">TOTAL CON DOMICILIO:</span>
+                  <span className="text-2xl font-bold text-green-700">
+                    ${calcularTotalConDomicilio().toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1283,7 +1215,6 @@ export default function POS() {
                   const estado = mesa?.estado || "vacia";
                   const colors = getColorPorEstado(estado);
                   const estadoTexto = getEstadoTexto(estado);
-                  const tieneHistorial = historialVentas[i]?.length > 0;
                   
                   return (
                     <button
@@ -1296,26 +1227,16 @@ export default function POS() {
                       }}
                       className={`
                         mesa-card
-                        ${mesaActual === i ? 'selected ring-4 ring-blue-400 ring-opacity-50' : ''}
+                        ${mesaActual === i ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
                         border-3
                         relative
                         cursor-pointer
                         transition-all duration-200
-                        hover:transform hover:scale-[1.02]
+                        hover:scale-105
                       `}
                       title={`Clic: Seleccionar | Doble clic: Ver pedido`}
                     >
-                      {tieneHistorial && (
-                        <button
-                          onClick={(e) => verHistorialMesa(i, e)}
-                          className="historial-btn"
-                          title="Ver historial de pedidos"
-                        >
-                          👁️
-                        </button>
-                      )}
-                      
-                      <div className="font-black text-xl md:text-2xl mb-1">
+                      <div className="font-black text-2xl mb-1">
                         M{i + 1}
                       </div>
                       
@@ -1340,7 +1261,6 @@ export default function POS() {
                   const estado = mesa?.estado || "vacia";
                   const colors = getColorPorEstado(estado);
                   const estadoTexto = getEstadoTexto(estado);
-                  const tieneHistorial = historialVentas[index]?.length > 0;
                   
                   return (
                     <button
@@ -1353,26 +1273,16 @@ export default function POS() {
                       }}
                       className={`
                         mesa-card
-                        ${mesaActual === index ? 'selected ring-4 ring-blue-400 ring-opacity-50' : ''}
+                        ${mesaActual === index ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
                         border-3
                         relative
                         cursor-pointer
                         transition-all duration-200
-                        hover:transform hover:scale-[1.02]
+                        hover:scale-105
                       `}
                       title={`Clic: Seleccionar | Doble clic: Ver pedido`}
                     >
-                      {tieneHistorial && (
-                        <button
-                          onClick={(e) => verHistorialMesa(index, e)}
-                          className="historial-btn"
-                          title="Ver historial de pedidos"
-                        >
-                          👁️
-                        </button>
-                      )}
-                      
-                      <div className="font-black text-xl md:text-2xl mb-1">
+                      <div className="font-black text-2xl mb-1">
                         M{index + 1}
                       </div>
                       
@@ -1410,7 +1320,6 @@ export default function POS() {
                 const estado = mesa?.estado || "vacia";
                 const colors = getColorPorEstado(estado);
                 const estadoTexto = getEstadoTexto(estado);
-                const tieneHistorial = historialVentas[index]?.length > 0;
                 
                 return (
                   <button
@@ -1423,26 +1332,16 @@ export default function POS() {
                     }}
                     className={`
                       mesa-card
-                      ${mesaActual === index ? 'selected ring-4 ring-blue-400 ring-opacity-50' : ''}
+                      ${mesaActual === index ? 'ring-4 ring-blue-400 ring-opacity-50' : ''}
                       border-3
                       relative
                       cursor-pointer
                       transition-all duration-200
-                      hover:transform hover:scale-[1.02]
+                      hover:scale-105
                     `}
                     title={`Clic: Seleccionar | Doble clic: Ver pedido`}
                   >
-                    {tieneHistorial && (
-                      <button
-                        onClick={(e) => verHistorialMesa(index, e)}
-                        className="historial-btn"
-                        title="Ver historial de pedidos"
-                      >
-                        👁️
-                      </button>
-                    )}
-                    
-                    <div className="font-black text-xl md:text-2xl mb-1 flex items-center gap-1">
+                    <div className="font-black text-2xl mb-1 flex items-center gap-1">
                       D{i + 1}
                       <span className="text-base">🚚</span>
                     </div>
@@ -1486,17 +1385,8 @@ export default function POS() {
             <div className="mb-6">
               <button
                 onClick={() => setShowMenuSeleccion(true)}
-                className="btn btn-orange w-full py-5 text-xl font-black shadow-lg hover:shadow-xl transition-all duration-300"
+                className="btn-orange w-full py-4 text-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300"
                 disabled={mesaActual === null}
-                style={{
-                  background: "linear-gradient(135deg, #ff922b 0%, #e8590c 100%)",
-                  border: "none",
-                  borderRadius: "16px",
-                  color: "white",
-                  padding: "20px",
-                  fontSize: "18px",
-                  fontWeight: "bold"
-                }}
               >
                 <div className="flex items-center justify-center gap-3">
                   <span className="text-2xl">🛒</span>
@@ -1524,32 +1414,6 @@ export default function POS() {
                 </div>
               )}
             </div>
-            
-            {/* CATEGORÍAS RÁPIDAS */}
-            {mesaActual !== null && (
-              <div className="mt-8">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Acceso rápido a categorías:</h3>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                  {categorias.slice(0, 6).map((categoria) => (
-                    <button
-                      key={categoria}
-                      onClick={() => {
-                        setShowMenuSeleccion(true);
-                        setCategoriaSeleccionada(categoria);
-                      }}
-                      className="quick-category-btn"
-                    >
-                      <div className="text-2xl mb-1">
-                        {getIconoPorCategoria(categoria)}
-                      </div>
-                      <div className="text-xs font-bold text-center leading-tight truncate">
-                        {categoria}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </section>
         </div>
 
@@ -1566,7 +1430,7 @@ export default function POS() {
                   <h2 className="reportes-subtitle">Orden Actual</h2>
                   {mesaActual !== null && (
                     <div className="flex items-center gap-3 mt-2">
-                      <span className="text-blue-600 font-black text-xl">
+                      <span className="text-blue-600 font-bold text-lg">
                         {mesas[mesaActual]?.tipo === "domicilio" 
                           ? `Domicilio D${mesaActual - 9}` 
                           : `Mesa M${mesaActual + 1}`
@@ -1598,26 +1462,26 @@ export default function POS() {
               {/* ESTADÍSTICAS RÁPIDAS */}
               {ordenTemporal.length > 0 && (
                 <div className="grid grid-cols-3 gap-3 mb-6">
-                  <div className="stat-card">
-                    <div className="stat-label">Productos</div>
-                    <div className="stat-value">{calcularProductosUnicos()}</div>
+                  <div className="p-3 bg-gray-50 rounded-lg text-center">
+                    <div className="text-sm text-gray-600">Productos</div>
+                    <div className="font-bold text-lg">{calcularProductosUnicos()}</div>
                   </div>
-                  <div className="stat-card">
-                    <div className="stat-label">Items</div>
-                    <div className="stat-value">{calcularTotalItems()}</div>
+                  <div className="p-3 bg-gray-50 rounded-lg text-center">
+                    <div className="text-sm text-gray-600">Items</div>
+                    <div className="font-bold text-lg">{calcularTotalItems()}</div>
                   </div>
-                  <div className="stat-card">
-                    <div className="stat-label">Subtotal</div>
-                    <div className="stat-value text-green-600">${calcularTotalTemporal().toLocaleString()}</div>
+                  <div className="p-3 bg-green-50 rounded-lg text-center">
+                    <div className="text-sm text-green-600">Subtotal</div>
+                    <div className="font-bold text-lg text-green-700">${calcularTotalTemporal().toLocaleString()}</div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* LISTA DE PRODUCTOS */}
+            {/* LISTA DE PRODUCTOS - ORGANIZADA EN CARDS */}
             <div className="flex-1 overflow-y-auto mb-8">
               {ordenTemporal.length === 0 ? (
-                <div className="empty-state-order text-center py-12">
+                <div className="text-center py-12">
                   <div className="text-gray-300 text-6xl mb-4">🛒</div>
                   <p className="text-gray-600 font-bold mb-2 text-lg">Orden vacía</p>
                   <p className="text-gray-400">Haz clic en "Escoger Productos" para agregar items</p>
@@ -1629,53 +1493,41 @@ export default function POS() {
                     const totalProducto = getPrice(p) * cantidad;
                     
                     return (
-                      <div key={i} className="order-item-compact">
-                        <div className="flex items-center justify-between">
-                          {/* CONTROLES DE CANTIDAD */}
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => decreaseQuantity(i)}
-                              className="quantity-btn-compact decrease"
-                              title="Disminuir"
-                            >
-                              −
-                            </button>
-                            <div className="quantity-display-compact">
-                              <span className="font-bold text-lg">{cantidad}</span>
-                            </div>
-                            <button 
-                              onClick={() => increaseQuantity(i)}
-                              className="quantity-btn-compact increase"
-                              title="Aumentar"
-                            >
-                              ＋
-                            </button>
+                      <div key={i} className="producto-card">
+                        <div className="producto-header">
+                          <span>• {getName(p)}</span>
+                          <span>${totalProducto.toLocaleString()}</span>
+                        </div>
+                        
+                        <div className="controles-cantidad">
+                          <button 
+                            onClick={() => decreaseQuantity(i)}
+                            className="w-8 h-8 bg-red-100 text-red-700 rounded-full flex items-center justify-center hover:bg-red-200"
+                            title="Disminuir"
+                          >
+                            −
+                          </button>
+                          <div className="w-10 text-center">
+                            <span className="font-bold text-lg">{cantidad}</span>
                           </div>
-                          
-                          {/* NOMBRE Y PRECIO */}
-                          <div className="flex-1 mx-4 min-w-0">
-                            <div className="font-bold text-gray-800 truncate">
-                              {getName(p)}
-                            </div>
-                            <div className="text-xs text-gray-600 flex items-center gap-2 mt-1">
-                              <span className="font-bold text-green-600">
-                                ${totalProducto.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {/* ACCIONES */}
+                          <button 
+                            onClick={() => increaseQuantity(i)}
+                            className="w-8 h-8 bg-green-100 text-green-700 rounded-full flex items-center justify-center hover:bg-green-200"
+                            title="Aumentar"
+                          >
+                            ＋
+                          </button>
                           <div className="flex gap-1">
                             <button 
                               onClick={() => abrirNota(i)} 
-                              className={`action-btn-compact ${p.nota ? 'has-note' : ''}`}
+                              className={`w-8 h-8 ${p.nota ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'} rounded-full flex items-center justify-center hover:opacity-80`}
                               title={p.nota || "Agregar nota"}
                             >
                               {p.nota ? "📝" : "✏️"}
                             </button>
                             <button 
                               onClick={() => removeFromTemp(i)} 
-                              className="action-btn-compact delete"
+                              className="w-8 h-8 bg-red-100 text-red-700 rounded-full flex items-center justify-center hover:bg-red-200"
                               title="Eliminar"
                             >
                               ✕
@@ -1685,7 +1537,7 @@ export default function POS() {
                         
                         {/* NOTA */}
                         {p.nota && (
-                          <div className="note-preview mt-2">
+                          <div className="mt-2">
                             <div className="text-xs font-semibold text-yellow-700 mb-1">📝 Nota:</div>
                             <div className="text-sm text-gray-700 bg-yellow-50 p-2 rounded border border-yellow-200">
                               {p.nota}
@@ -1699,38 +1551,38 @@ export default function POS() {
               )}
             </div>
 
-            {/* RESUMEN FINAL */}
+            {/* RESUMEN FINAL - CORREGIDO PARA MOSTRAR DESGLOSE CLARO */}
             <div className="summary-final mb-8">
               <div className="space-y-4">
-                {mesaActual !== null && mesas[mesaActual]?.domicilio > 0 && (
-                  <div className="flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
-                    <div className="flex items-center gap-3">
-                      <span className="text-blue-600 text-xl">🚚</span>
-                      <div>
-                        <div className="font-bold text-gray-800">Domicilio</div>
-                        <div className="text-sm text-gray-600">Entrega a domicilio</div>
-                      </div>
-                    </div>
-                    <span className="font-bold text-green-600 text-lg">
-                      +${mesas[mesaActual].domicilio.toLocaleString()}
-                    </span>
-                  </div>
-                )}
-                
-                <div className="total-final">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xl font-bold text-gray-800">Subtotal:</span>
-                    <span className="text-2xl font-black text-gray-800">
-                      ${calcularTotalTemporal().toLocaleString()}
-                    </span>
-                  </div>
-                  
-                  <div className="border-t border-gray-300 pt-4">
+                {/* DESGLOSE DEL TOTAL */}
+                <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-xl border border-gray-200">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-2xl font-black text-gray-900">TOTAL:</span>
-                      <span className="text-3xl font-black text-green-600">
-                        ${(calcularTotalTemporal() + (mesaActual !== null ? mesas[mesaActual]?.domicilio || 0 : 0)).toLocaleString()}
+                      <span className="text-gray-700">Subtotal productos:</span>
+                      <span className="font-bold text-gray-800">
+                        ${calcularTotalTemporal().toLocaleString()}
                       </span>
+                    </div>
+                    
+                    {mesaActual !== null && mesas[mesaActual]?.domicilio > 0 && (
+                      <div className="flex justify-between items-center bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-lg border border-green-200">
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-600">🚚</span>
+                          <span className="text-gray-700">Costo domicilio:</span>
+                        </div>
+                        <span className="font-bold text-green-600">
+                          +${mesas[mesaActual].domicilio.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="border-t border-gray-300 pt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xl font-bold text-gray-900">TOTAL A PAGAR:</span>
+                        <span className="text-2xl font-bold text-green-600">
+                          ${calcularTotalConDomicilio().toLocaleString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1741,7 +1593,7 @@ export default function POS() {
             <div className="space-y-3 mt-auto">
               <button
                 onClick={enviarACocina}
-                className="btn-gradient-success w-full py-4 text-lg font-black"
+                className="btn-gradient-success w-full py-3 text-lg font-bold"
                 disabled={ordenTemporal.length === 0}
               >
                 🚀 Enviar a Cocina
@@ -1750,7 +1602,7 @@ export default function POS() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={generarFacturaMesa}
-                  className="btn-gradient-purple w-full py-3 font-bold"
+                  className="bg-purple-600 hover:bg-purple-700 text-white w-full py-3 font-bold rounded-lg"
                   disabled={mesaActual === null || mesas[mesaActual]?.items.length === 0}
                 >
                   📄 Factura
@@ -1758,7 +1610,7 @@ export default function POS() {
 
                 <button
                   onClick={abrirModalCobrar}
-                  className="btn-gradient-primary w-full py-3 font-bold"
+                  className="bg-blue-600 hover:bg-blue-700 text-white w-full py-3 font-bold rounded-lg"
                   disabled={mesaActual === null || mesas[mesaActual]?.items.length === 0 || !fechaActiva}
                   title={!fechaActiva ? "Selecciona una fecha en Reportes primero" : "Cobrar mesa"}
                 >
@@ -1768,7 +1620,7 @@ export default function POS() {
 
               <button
                 onClick={abrirDividirCuenta}
-                className="btn-gradient-orange w-full py-3 font-bold"
+                className="bg-orange-500 hover:bg-orange-600 text-white w-full py-3 font-bold rounded-lg"
                 disabled={mesaActual === null || totalMesaEnCocina(mesaActual) === 0 || !fechaActiva}
                 title={!fechaActiva ? "Selecciona una fecha en Reportes primero" : "Dividir cuenta"}
               >
@@ -1778,14 +1630,14 @@ export default function POS() {
               <div className="grid grid-cols-2 gap-3 pt-3">
                 <Link
                   to="/kitchen"
-                  className="btn-gradient-indigo text-center py-3 font-bold"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-center py-3 font-bold rounded-lg"
                 >
                   👨‍🍳 Cocina
                 </Link>
 
                 <Link
                   to="/reportes"
-                  className="btn-gradient-purple text-center py-3 font-bold"
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-center py-3 font-bold rounded-lg"
                 >
                   📊 Reportes
                 </Link>
@@ -1795,234 +1647,7 @@ export default function POS() {
         </div>
       </div>
 
-      {/* MODALES */}
-      {showMesaPedido && mesaSeleccionadaPedido !== null && (
-        <div className="modal-overlay">
-          <div className="modal-content-large">
-            <div className="modal-header">
-              <h3>
-                📋 Pedido de {mesas[mesaSeleccionadaPedido]?.tipo === "domicilio" 
-                  ? `Domicilio D${mesaSeleccionadaPedido - 9}` 
-                  : `Mesa M${mesaSeleccionadaPedido + 1}`}
-              </h3>
-              <button 
-                onClick={cerrarModalPedidoMesa} 
-                className="modal-close"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="modal-body">
-              {(!mesas[mesaSeleccionadaPedido]?.items || mesas[mesaSeleccionadaPedido]?.items.length === 0) ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
-                  <p className="text-gray-600 font-bold mb-2">No hay productos en esta mesa</p>
-                  <p className="text-gray-400">Agrega productos desde la orden temporal</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="resumen-dividir p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-sm text-blue-700 font-semibold">Total Productos</div>
-                        <div className="text-2xl font-black text-blue-900">
-                          {mesas[mesaSeleccionadaPedido].items.length}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-green-700 font-semibold">Total a Pagar</div>
-                        <div className="text-2xl font-black text-green-700">
-                          ${totalMesaEnCocina(mesaSeleccionadaPedido).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-bold text-lg mb-3 text-gray-800">Productos en la mesa:</h4>
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                      {mesas[mesaSeleccionadaPedido].items.map((item, index) => {
-                        const cantidad = item.cantidad || 1;
-                        const totalProducto = item.precio * cantidad;
-                        
-                        return (
-                          <div key={index} className="producto-detalle bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <div className="font-bold text-gray-800 text-lg">{item.nombre}</div>
-                                <div className="text-sm text-gray-600">
-                                  Cantidad: <span className="font-bold">{cantidad}</span>
-                                </div>
-                                {item.nota && (
-                                  <div className="text-sm text-yellow-700 bg-yellow-50 px-2 py-1 rounded mt-2">
-                                    📝 {item.nota}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <div className="font-bold text-lg text-green-600">
-                                  ${totalProducto.toLocaleString()}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  
-                  {mesas[mesaSeleccionadaPedido].domicilio > 0 && (
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">🚚</span>
-                          <div>
-                            <div className="font-bold text-gray-800">Domicilio</div>
-                            <div className="text-sm text-gray-600">Costo de entrega</div>
-                          </div>
-                        </div>
-                        <div className="font-bold text-2xl text-green-700">
-                          +${mesas[mesaSeleccionadaPedido].domicilio.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div className="modal-footer mt-6 pt-6 border-t border-gray-200">
-              <div className="flex justify-center">
-                <button
-                  onClick={cerrarModalPedidoMesa}
-                  className="btn btn-blue px-8"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE HISTORIAL */}
-      {showHistorial && historialMesa !== null && (
-        <div className="historial-modal">
-          <div className="historial-content">
-            <div className="historial-header">
-              <h3>📋 Historial de {mesas[historialMesa]?.tipo === "domicilio" 
-                ? `Domicilio D${historialMesa - 9}` 
-                : `Mesa M${historialMesa + 1}`}
-              </h3>
-              <button 
-                onClick={() => setShowHistorial(false)} 
-                className="historial-close"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="historial-body">
-              {(!historialVentas[historialMesa] || historialVentas[historialMesa].length === 0) ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
-                  <p className="text-gray-600 font-bold mb-2">No hay historial de ventas</p>
-                  <p className="text-gray-400">Los pedidos aparecerán aquí después de cobrar</p>
-                </div>
-              ) : (
-                <div className="historial-list">
-                  {historialVentas[historialMesa]
-                    .slice()
-                    .reverse()
-                    .map((venta) => (
-                      <div key={venta.id} className="historial-item">
-                        <div className="historial-fecha">
-                          <span>📅</span>
-                          {new Date(venta.fecha).toLocaleDateString('es-CO', {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                          {venta.dividido && (
-                            <span className="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-1 rounded-full ml-2">
-                              Dividido
-                            </span>
-                          )}
-                        </div>
-                        
-                        <div className="historial-products">
-                          {venta.items.map((item, idx) => (
-                            <div key={idx} className="historial-product">
-                              <div className="flex items-center gap-2">
-                                <span>{item.nombre}</span>
-                                <span className="text-gray-500 text-sm">
-                                  × {item.cantidad || 1}
-                                </span>
-                              </div>
-                              <span className="font-bold">
-                                ${((item.precio || 0) * (item.cantidad || 1)).toLocaleString()}
-                              </span>
-                            </div>
-                          ))}
-                          
-                          {venta.domicilio > 0 && (
-                            <div className="historial-product">
-                              <span className="flex items-center gap-2">
-                                <span>🚚 Domicilio</span>
-                              </span>
-                              <span className="font-bold text-green-600">
-                                +${venta.domicilio.toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="historial-total">
-                          <div>
-                            <span className="font-bold">Total:</span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              {venta.metodo === "efectivo" ? "💵 Efectivo" : 
-                               venta.metodo === "nequi" ? "📱 Nequi" : 
-                               venta.metodo === "mixto" ? "🔄 Mixto" : 
-                               venta.metodo === "dividido" ? "👥 Dividido" : "Otro"}
-                            </span>
-                          </div>
-                          <span className="text-2xl font-black text-green-600">
-                            ${venta.total.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-            
-            <div className="historial-footer mt-6 pt-4 border-t border-gray-200">
-              <div className="flex justify-between">
-                <button
-                  onClick={limpiarHistorialMesa}
-                  className="btn btn-gray"
-                  disabled={!historialVentas[historialMesa]?.length}
-                >
-                  🗑️ Limpiar historial
-                </button>
-                <button
-                  onClick={() => setShowHistorial(false)}
-                  className="btn btn-blue"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE SELECCIÓN DE PRODUCTOS */}
+      {/* MODAL DE PRODUCTOS - MEJORADO */}
       {showMenuSeleccion && (
         <div className="modal-overlay">
           <div className="modal-content-large">
@@ -2046,30 +1671,30 @@ export default function POS() {
             <div className="modal-body">
               {!categoriaSeleccionada ? (
                 <div>
-                  <h4 className="modal-subtitle">Selecciona una categoría:</h4>
-                  <div className="categorias-grid">
+                  <h4 className="text-lg font-bold mb-4">Selecciona una categoría:</h4>
+                  <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
                     {categorias.map((categoria) => (
                       <button
                         key={categoria}
                         onClick={() => setCategoriaSeleccionada(categoria)}
-                        className="categoria-btn-modal"
+                        className="p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors text-center"
                       >
-                        <div className="categoria-icon">{getIconoPorCategoria(categoria)}</div>
-                        <div className="categoria-nombre">{categoria}</div>
+                        <div className="text-2xl mb-2">{getIconoPorCategoria(categoria)}</div>
+                        <div className="text-sm font-medium">{categoria}</div>
                       </button>
                     ))}
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="modal-back">
+                  <div className="flex items-center gap-4 mb-6">
                     <button
                       onClick={() => setCategoriaSeleccionada(null)}
-                      className="btn-back"
+                      className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
                     >
                       ← Volver
                     </button>
-                    <h4 className="modal-categoria">{categoriaSeleccionada}</h4>
+                    <h4 className="text-lg font-bold">{categoriaSeleccionada}</h4>
                   </div>
                   
                   {productosFiltrados.length === 0 ? (
@@ -2087,14 +1712,14 @@ export default function POS() {
                           <button
                             key={productId}
                             onClick={() => addToTemp(producto)}
-                            className={`producto-btn-modal ${cantidad > 0 ? 'producto-selected' : ''}`}
+                            className={`p-4 rounded-lg border-2 ${cantidad > 0 ? 'producto-seleccionado' : 'border-gray-200 bg-white'} hover:border-blue-400 transition-all`}
                           >
-                            <div className="producto-nombre-modal">{getName(producto)}</div>
-                            <div className="producto-precio-modal">
+                            <div className="font-medium text-gray-800 mb-1">{getName(producto)}</div>
+                            <div className="text-green-600 font-bold">
                               ${getPrice(producto).toLocaleString()}
                             </div>
                             {cantidad > 0 && (
-                              <div className="producto-cantidad-badge">
+                              <div className="mt-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                                 Seleccionado: {cantidad}
                               </div>
                             )}
@@ -2107,31 +1732,168 @@ export default function POS() {
               )}
             </div>
             
-            <div className="modal-footer">
-              <div className="modal-total">
-                <div className="modal-total-label">Total seleccionado:</div>
-                <div className="modal-total-valor">
-                  ${calcularSubtotalProductos().toLocaleString()}
+            <div className="modal-footer p-4 border-t border-gray-200">
+              {/* LISTA DE PRODUCTOS SELECCIONADOS CON VIÑETAS */}
+              {ordenTemporal.length > 0 && (
+                <div className="lista-seleccionados mb-4">
+                  <h4>Productos seleccionados ({ordenTemporal.length}):</h4>
+                  <ul>
+                    {ordenTemporal.map((p, i) => (
+                      <li key={i}>
+                        <span>{getName(p)}</span>
+                        <span className="font-bold text-green-600">
+                          ${(getPrice(p) * (p.cantidad || 1)).toLocaleString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="modal-total-count">
-                  {ordenTemporal.length} productos • {calcularTotalItems()} items
+              )}
+              
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="text-sm text-gray-600">Total seleccionado:</div>
+                  <div className="text-xl font-bold text-green-600">
+                    ${calcularSubtotalProductos().toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {ordenTemporal.length} productos • {calcularTotalItems()} items
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setOrdenTemporal([]);
+                      setCategoriaSeleccionada(null);
+                    }}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    onClick={() => setShowMenuSeleccion(false)}
+                    className="btn-modal-verde"
+                  >
+                    Listo ✓
+                  </button>
                 </div>
               </div>
-              <div className="modal-actions">
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE PEDIDO DE MESA - CORREGIDO PARA MOSTRAR DOMICILIO */}
+      {showMesaPedido && mesaSeleccionadaPedido !== null && (
+        <div className="modal-overlay">
+          <div className="modal-content-large">
+            <div className="modal-header">
+              <h3>
+                📋 Pedido de {mesas[mesaSeleccionadaPedido]?.tipo === "domicilio" 
+                  ? `Domicilio D${mesaSeleccionadaPedido - 9}` 
+                  : `Mesa M${mesaSeleccionadaPedido + 1}`}
+              </h3>
+              <button 
+                onClick={cerrarModalPedidoMesa} 
+                className="modal-close"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              {(!mesas[mesaSeleccionadaPedido]?.items || mesas[mesaSeleccionadaPedido]?.items.length === 0) ? (
+                <div className="text-center py-12">
+                  <div className="text-gray-300 text-6xl mb-4">📭</div>
+                  <p className="text-gray-600 font-bold mb-2">No hay productos en esta mesa</p>
+                  <p className="text-gray-400">Agrega productos desde la orden temporal</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* DESGLOSE DEL TOTAL */}
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <div className="text-sm text-blue-700 font-semibold">Total Productos</div>
+                        <div className="text-2xl font-bold text-blue-900">
+                          {mesas[mesaSeleccionadaPedido].items.length}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-blue-700 font-semibold">Costo Domicilio</div>
+                        <div className="text-2xl font-bold text-blue-900">
+                          ${(mesas[mesaSeleccionadaPedido].domicilio || 0).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-blue-200 pt-3">
+                      <div className="flex justify-between items-center">
+                        <div className="text-lg font-bold text-gray-800">TOTAL A PAGAR:</div>
+                        <div className="text-2xl font-bold text-green-700">
+                          ${totalMesaEnCocina(mesaSeleccionadaPedido).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-bold text-lg mb-3 text-gray-800">Productos en la mesa:</h4>
+                    <ul className="lista-productos space-y-3 max-h-96 overflow-y-auto pr-2">
+                      {mesas[mesaSeleccionadaPedido].items.map((item, index) => {
+                        const cantidad = item.cantidad || 1;
+                        const totalProducto = item.precio * cantidad;
+                        
+                        return (
+                          <li key={index} className="producto-item">
+                            <div>
+                              <div className="font-bold text-gray-800">{item.nombre}</div>
+                              <div className="text-sm text-gray-600">
+                                Cantidad: <span className="font-bold">{cantidad}</span>
+                              </div>
+                              {item.nota && (
+                                <div className="text-sm text-yellow-700 bg-yellow-50 px-2 py-1 rounded mt-2">
+                                  📝 {item.nota}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-green-600">
+                                ${totalProducto.toLocaleString()}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  
+                  {mesas[mesaSeleccionadaPedido].domicilio > 0 && (
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">🚚</span>
+                          <div>
+                            <div className="font-bold text-gray-800">Costo de Domicilio</div>
+                            <div className="text-sm text-gray-600">Se suma al total</div>
+                          </div>
+                        </div>
+                        <div className="font-bold text-xl text-green-700">
+                          +${mesas[mesaSeleccionadaPedido].domicilio.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="modal-footer mt-6 pt-6 border-t border-gray-200">
+              <div className="flex justify-center">
                 <button
-                  onClick={() => {
-                    setOrdenTemporal([]);
-                    setCategoriaSeleccionada(null);
-                  }}
-                  className="btn btn-gray"
+                  onClick={cerrarModalPedidoMesa}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                 >
-                  Limpiar todo
-                </button>
-                <button
-                  onClick={() => setShowMenuSeleccion(false)}
-                  className="btn btn-orange"
-                >
-                  Listo ✓
+                  Cerrar
                 </button>
               </div>
             </div>
@@ -2139,10 +1901,10 @@ export default function POS() {
         </div>
       )}
 
-      {/* MODAL DE COBRAR */}
+      {/* MODAL DE COBRAR - MEJORADO PARA MOSTRAR DESGLOSE */}
       {openCobrar && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content max-w-md">
             <div className="modal-header">
               <h3>💰 Cobrar {mesas[mesaActual]?.tipo === "domicilio" ? 
                 `Domicilio D${mesaActual - 9}` : 
@@ -2159,14 +1921,45 @@ export default function POS() {
                   <span className="text-blue-600">📅</span>
                   <div>
                     <div className="font-bold text-blue-800">Venta se guardará con fecha:</div>
-                    <div className="text-lg font-black text-blue-900">{fechaActiva}</div>
+                    <div className="text-lg font-bold text-blue-900">{fechaActiva}</div>
                   </div>
                 </div>
               </div>
               
-              <div className="cobro-total">
-                <div className="cobro-total-label">Total a pagar:</div>
-                <div className="cobro-total-valor">${totalAPagar.toLocaleString()}</div>
+              {/* DESGLOSE DEL TOTAL */}
+              <div className="mb-6">
+                <h4 className="font-bold text-gray-800 mb-3 text-center">Desglose del total</h4>
+                
+                {/* Calcular subtotal de productos */}
+                {mesaActual !== null && (
+                  <>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-700">Productos:</span>
+                      <span className="font-bold text-gray-800">
+                        ${(mesas[mesaActual].items || []).reduce((sum, item) => 
+                          sum + (item.precio * (item.cantidad || 1)), 0).toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {mesas[mesaActual].domicilio > 0 && (
+                      <div className="flex justify-between items-center mb-2 bg-green-50 p-2 rounded">
+                        <span className="text-gray-700 flex items-center gap-1">
+                          <span>🚚</span> Domicilio:
+                        </span>
+                        <span className="font-bold text-green-600">
+                          +${mesas[mesaActual].domicilio.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="border-t border-gray-300 pt-3 mt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-bold text-gray-900">TOTAL A PAGAR:</span>
+                        <span className="text-2xl font-bold text-green-600">${totalAPagar.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="mb-6">
@@ -2211,13 +2004,8 @@ export default function POS() {
                     value={montoEfectivo}
                     onChange={(e) => setMontoEfectivo(e.target.value)}
                     placeholder="0"
-                    className="modern-input"
+                    className="w-full p-3 border border-gray-300 rounded-lg"
                   />
-                  {metodoPago === "mixto" && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Monto en efectivo (el resto será Nequi)
-                    </div>
-                  )}
                 </div>
               )}
               
@@ -2231,21 +2019,17 @@ export default function POS() {
                     value={montoNequi}
                     onChange={(e) => setMontoNequi(e.target.value)}
                     placeholder="0"
-                    className="modern-input"
+                    className="w-full p-3 border border-gray-300 rounded-lg"
                   />
                   <div className="text-sm text-gray-600 mt-2">
                     <div>📱 Nequi: <span className="font-bold">{NEQUI_NUM}</span></div>
                     <div>👤 Titular: <span className="font-bold">{NEQUI_TITULAR}</span></div>
                   </div>
-                  {metodoPago === "mixto" && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Monto en Nequi (complementa el efectivo)
-                    </div>
-                  )}
                 </div>
               )}
               
-              <div className="cobro-resumen p-4 bg-gray-50 rounded-lg">
+              {/* RESUMEN DE PAGO */}
+              <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex justify-between mb-2">
                   <span>Total a pagar:</span>
                   <span className="font-bold">${totalAPagar.toLocaleString()}</span>
@@ -2269,7 +2053,7 @@ export default function POS() {
                 <div className="border-t pt-2 mt-2">
                   <div className="flex justify-between">
                     <span className="font-bold">Diferencia:</span>
-                    <span className={`font-bold text-lg ${diferencia >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <span className={`font-bold ${diferencia >= 0 ? "text-green-600" : "text-red-600"}`}>
                       {diferencia >= 0 ? "Vuelto:" : "Falta:"} ${Math.abs(diferencia).toLocaleString()}
                     </span>
                   </div>
@@ -2277,16 +2061,16 @@ export default function POS() {
               </div>
             </div>
             
-            <div className="modal-footer">
+            <div className="modal-footer flex gap-3">
               <button
                 onClick={() => setOpenCobrar(false)}
-                className="btn btn-gray"
+                className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg"
               >
                 Cancelar
               </button>
               <button
                 onClick={procesarPago}
-                className="btn btn-green"
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg"
                 disabled={recibidoTotal < totalAPagar}
               >
                 ✅ Confirmar Pago
@@ -2314,7 +2098,7 @@ export default function POS() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Número de personas:
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap gap-2">
                   {[2, 3, 4, 5, 6].map((num) => (
                     <button
                       key={num}
@@ -2337,7 +2121,7 @@ export default function POS() {
                   {mesas[mesaActual]?.items.map((item, index) => {
                     const asignadoA = productosAsignados[index];
                     return (
-                      <div key={index} className="producto-asignar">
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg">
                         <div className="flex justify-between items-center">
                           <div>
                             <div className="font-bold">{item.nombre}</div>
@@ -2345,27 +2129,25 @@ export default function POS() {
                               ${item.precio.toLocaleString()} × {item.cantidad || 1}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={asignadoA || ""}
-                              onChange={(e) => {
-                                if (e.target.value === "todos") {
-                                  dividirProducto(index);
-                                } else {
-                                  asignarProducto(index, parseInt(e.target.value));
-                                }
-                              }}
-                              className="modern-input"
-                            >
-                              <option value="">Sin asignar</option>
-                              {Array.from({ length: personasDividir }, (_, i) => i + 1).map((p) => (
-                                <option key={p} value={p}>
-                                  Persona {p}
-                                </option>
-                              ))}
-                              <option value="todos">Dividir entre todos</option>
-                            </select>
-                          </div>
+                          <select
+                            value={asignadoA || ""}
+                            onChange={(e) => {
+                              if (e.target.value === "todos") {
+                                dividirProducto(index);
+                              } else {
+                                asignarProducto(index, parseInt(e.target.value));
+                              }
+                            }}
+                            className="p-2 border border-gray-300 rounded"
+                          >
+                            <option value="">Sin asignar</option>
+                            {Array.from({ length: personasDividir }, (_, i) => i + 1).map((p) => (
+                              <option key={p} value={p}>
+                                Persona {p}
+                              </option>
+                            ))}
+                            <option value="todos">Dividir entre todos</option>
+                          </select>
                         </div>
                       </div>
                     );
@@ -2373,13 +2155,13 @@ export default function POS() {
                 </div>
               </div>
               
-              <div className="resumen-dividir p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-bold text-lg mb-3">Resumen por persona:</h4>
                 <div className="grid grid-cols-2 gap-3">
                   {Array.from({ length: personasDividir }, (_, i) => i + 1).map((persona) => (
                     <div key={persona} className="bg-white p-3 rounded border">
                       <div className="font-bold text-gray-800">Persona {persona}</div>
-                      <div className="text-green-600 font-bold text-lg">
+                      <div className="text-green-600 font-bold">
                         ${calcularSubtotalPersona(persona).toLocaleString()}
                       </div>
                     </div>
@@ -2387,34 +2169,36 @@ export default function POS() {
                 </div>
               </div>
               
-              <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-yellow-600 text-xl">⚠️</span>
-                  <div>
-                    <div className="font-bold text-yellow-700">
-                      {productosSinAsignar()} productos sin asignar
+              {productosSinAsignar() > 0 && (
+                <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="text-yellow-600">⚠️</span>
+                    <div>
+                      <div className="font-bold text-yellow-700">
+                        {productosSinAsignar()} productos sin asignar
+                      </div>
+                      <p className="text-sm text-yellow-600">
+                        Asigna todos los productos antes de continuar
+                      </p>
                     </div>
-                    <p className="text-sm text-yellow-600">
-                      Asigna todos los productos antes de continuar
-                    </p>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
             
-            <div className="modal-footer">
+            <div className="modal-footer flex gap-3">
               <button
                 onClick={() => setShowDividirCuenta(false)}
-                className="btn btn-gray"
+                className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg"
               >
                 Cancelar
               </button>
               <button
                 onClick={irAPagoIndividual}
-                className="btn btn-orange"
+                className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg"
                 disabled={productosSinAsignar() > 0}
               >
-                Continuar con pagos individuales
+                Continuar
               </button>
             </div>
           </div>
@@ -2424,7 +2208,7 @@ export default function POS() {
       {/* MODAL DE PAGO INDIVIDUAL */}
       {showPagoIndividual && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content max-w-md">
             <div className="modal-header">
               <h3>💳 Pago individual - Persona {personaAPagar}</h3>
               <button onClick={() => setShowPagoIndividual(false)} className="modal-close">
@@ -2435,45 +2219,18 @@ export default function POS() {
             <div className="modal-body">
               <div className="mb-6 text-center">
                 <div className="text-6xl mb-4">👤</div>
-                <div className="text-3xl font-bold text-gray-800">Persona {personaAPagar}</div>
+                <div className="text-2xl font-bold text-gray-800">Persona {personaAPagar}</div>
                 <div className="text-sm text-gray-600">
                   de {personasDividir} personas
                 </div>
               </div>
               
               <div className="mb-6">
-                <div className="cobro-total">
-                  <div className="cobro-total-label">Total a pagar:</div>
-                  <div className="cobro-total-valor">
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-1">Total a pagar:</div>
+                  <div className="text-3xl font-bold text-green-600">
                     ${calcularSubtotalPersona(personaAPagar).toLocaleString()}
                   </div>
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <h4 className="font-bold mb-3">Productos asignados:</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {mesas[mesaActual]?.items
-                    .filter((_, index) => {
-                      const asignadoA = productosAsignados[index];
-                      return asignadoA === personaAPagar || asignadoA === "todos";
-                    })
-                    .map((item, index) => {
-                      const asignadoA = productosAsignados[index];
-                      let cantidad = item.cantidad || 1;
-                      if (asignadoA === "todos") {
-                        cantidad = cantidad / personasDividir;
-                      }
-                      
-                      return (
-                        <div key={index} className="flex justify-between items-center text-sm">
-                          <div className="truncate">{item.nombre}</div>
-                          <div className="font-bold">
-                            ${item.precio.toLocaleString()} × {cantidad.toFixed(2)}
-                          </div>
-                        </div>
-                      );
-                    })}
                 </div>
               </div>
               
@@ -2483,23 +2240,23 @@ export default function POS() {
                     <div className="font-bold text-green-800">Total Persona {personaAPagar}</div>
                     <div className="text-sm text-green-600">Incluye domicilio dividido</div>
                   </div>
-                  <div className="text-2xl font-black text-green-600">
+                  <div className="text-2xl font-bold text-green-600">
                     ${calcularSubtotalPersona(personaAPagar).toLocaleString()}
                   </div>
                 </div>
               </div>
             </div>
             
-            <div className="modal-footer">
+            <div className="modal-footer flex gap-3">
               <button
                 onClick={() => setShowPagoIndividual(false)}
-                className="btn btn-gray"
+                className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg"
               >
                 Cancelar
               </button>
               <button
                 onClick={() => pagarPersona(personaAPagar)}
-                className="btn btn-green"
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg"
               >
                 ✅ Registrar pago
               </button>
@@ -2511,7 +2268,7 @@ export default function POS() {
       {/* MODAL DE NOTA */}
       {showNotaModal && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content max-w-md">
             <div className="modal-header">
               <h3>📝 Agregar nota</h3>
               <button onClick={() => setShowNotaModal(false)} className="modal-close">
@@ -2524,23 +2281,23 @@ export default function POS() {
                 value={notaTemp}
                 onChange={(e) => setNotaTemp(e.target.value)}
                 placeholder="Ej: Sin cebolla, bien cocido, etc."
-                className="modern-textarea"
+                className="w-full p-3 border border-gray-300 rounded-lg"
                 rows="4"
               />
             </div>
             
-            <div className="modal-footer">
+            <div className="modal-footer flex gap-3">
               <button
                 onClick={() => setShowNotaModal(false)}
-                className="btn btn-gray"
+                className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg"
               >
                 Cancelar
               </button>
               <button
                 onClick={guardarNota}
-                className="btn btn-blue"
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
               >
-                Guardar nota
+                Guardar
               </button>
             </div>
           </div>
