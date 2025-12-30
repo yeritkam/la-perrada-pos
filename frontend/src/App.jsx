@@ -1,4 +1,4 @@
-﻿// src/App.jsx - VERSIÓN SIMPLIFICADA (GitHub Pages en raíz)
+﻿// src/App.jsx - VERSIÓN ORIGINAL (con basename dinámico)
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
@@ -15,9 +15,13 @@ import LoginReportes from './pages/reportes/LoginReportes.jsx';
 
 function App() {
   const isAuthenticated = true;
+  
+  // ✅ DETECTAR SI ESTAMOS EN GITHUB PAGES
+  const isGitHubPages = window.location.hostname === 'gasons30.github.io';
+  const basename = isGitHubPages ? '/la-perrada-pos' : '';
 
   return (
-    <Router>  {/* ✅ SIN basename - GitHub Pages ahora en raíz */}
+    <Router basename={basename}>  {/* ✅ CON basename dinámico */}
       <div className="App">
         <Routes>
           <Route path="/" element={<POS />} />
@@ -30,11 +34,11 @@ function App() {
           <Route path="/productos" element={<Products />} />
           <Route path="/reportes" element={<Reportes />} />
           
-          {/* ✅ RUTAS CORREGIDAS */}
-          <Route path="/admin" element={
+          {/* ✅ RUTAS ORIGINALES (con /reportes/) */}
+          <Route path="/reportes/admin" element={
             isAuthenticated ? <AdminReportes /> : <Navigate to="/" />
           } />
-          <Route path="/gerson" element={
+          <Route path="/reportes/gerson" element={
             isAuthenticated ? <GersonReportes /> : <Navigate to="/" />
           } />
           
