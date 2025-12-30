@@ -3,7 +3,7 @@
 on:
   push:
     branches: [ "master" ]
-  workflow_dispatch:  # Permite ejecución manual
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,30 +11,29 @@ permissions:
   id-token: write
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "18"
-          cache: "npm"
-          cache-dependency-path: "frontend/package-lock.json"
       
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./frontend
+      - name: Clean install dependencies
+        run: |
+          cd frontend
+          npm install --no-audit --no-fund
       
-      - name: Build application
-        run: npm run build
-        working-directory: ./frontend
+      - name: Build
+        run: |
+          cd frontend
+          npm run build
       
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./frontend/dist
-          force_orphan: true  # Mantiene solo la última versión
+          force_orphan: true
