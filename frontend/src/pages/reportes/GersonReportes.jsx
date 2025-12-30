@@ -54,7 +54,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
     localStorage.removeItem('estadoCaja');
     
     const isGitHubPages = window.location.hostname.includes('github.io');
-    const basePath = isGitHubPages ? '/la-perrada-pos' : '';
+    const basePath = '';  // ✅ CAMBIADO: GitHub Pages ahora en raíz
     
     window.location.href = basePath + '/';
     
