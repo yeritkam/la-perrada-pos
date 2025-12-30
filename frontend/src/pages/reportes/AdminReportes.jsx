@@ -48,9 +48,9 @@ const AdminReportes = ({ usuario, onLogout }) => {
     localStorage.removeItem('estadoCaja');
     
     const isGitHubPages = window.location.hostname.includes('github.io');
-    const basePath = isGitHubPages ? '/la-perrada-pos' : '';  
+    const basePath = isGitHubPages ? '/la-perrada-pos' : '';
     
-window.location.href = basePath + '/';
+    window.location.href = basePath + '/reportes';
     
     setTimeout(() => {
       window.location.reload(true);

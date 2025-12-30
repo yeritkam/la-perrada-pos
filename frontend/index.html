@@ -2,42 +2,17 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/la-perrada-pos/logo.png" />
+    <!-- CORREGIDO: ruta absoluta para favicon -->
+    <link rel="icon" type="image/x-icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="Sistema POS La Perrada de Piter" />
     <title>La Perrada de Piter - Sistema POS</title>
-    
-    <!-- ✅ FIX PARA GITHUB PAGES SPA -->
-    <script>
-      (function() {
-        if (window.location.hostname.includes('github.io')) {
-          var path = window.location.pathname;
-          var base = '/la-perrada-pos/';
-          
-          // Si estamos en '/la-perrada-pos' sin slash, agregar slash
-          if (path === base.slice(0, -1)) {
-            window.location.replace(base);
-          }
-          
-          // Guardar ruta para React Router
-          if (path !== base && !path.startsWith(base + 'assets/')) {
-            sessionStorage.setItem('ghpages_redirect', path);
-          }
-        }
-      })();
-    </script>
   </head>
   <body>
-    <noscript>
-      <div style="text-align: center; padding: 50px; font-family: Arial;">
-        <h1>⚠️ JavaScript Requerido</h1>
-        <p>Este sistema requiere JavaScript para funcionar correctamente.</p>
-        <a href="/la-perrada-pos/" style="color: blue;">Recargar Página</a>
-      </div>
-    </noscript>
-    
+    <noscript>Necesitas habilitar JavaScript para usar esta aplicación.</noscript>
     <div id="root"></div>
-    <!-- Vite inyectará el script correcto aquí -->
+    <!-- ⬇️⬇️⬇️ ESTA LÍNEA ES LA IMPORTANTE ⬇️⬇️⬇️ -->
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-﻿// src/App.jsx - VERSIÓN ORIGINAL (con basename dinámico)
+﻿// src/App.jsx - VERSIÓN PARA DESARROLLO LOCAL
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
@@ -15,13 +15,9 @@ import LoginReportes from './pages/reportes/LoginReportes.jsx';
 
 function App() {
   const isAuthenticated = true;
-  
-  // ✅ DETECTAR SI ESTAMOS EN GITHUB PAGES
-  const isGitHubPages = window.location.hostname === 'gasons30.github.io';
-  const basename = isGitHubPages ? '/la-perrada-pos' : '';
 
   return (
-    <Router basename={basename}>  {/* ✅ CON basename dinámico */}
+    <Router>  {/* ← SIN basename para desarrollo */}
       <div className="App">
         <Routes>
           <Route path="/" element={<POS />} />
@@ -29,19 +25,16 @@ function App() {
           
           {/* RUTAS DE COCINA - AMBAS FUNCIONAN */}
           <Route path="/cocina" element={<Kitchen />} />
-          <Route path="/kitchen" element={<Kitchen />} />
+          <Route path="/kitchen" element={<Kitchen />} /> {/* ← NUEVA RUTA AGREGADA */}
           
           <Route path="/productos" element={<Products />} />
           <Route path="/reportes" element={<Reportes />} />
-          
-          {/* ✅ RUTAS ORIGINALES (con /reportes/) */}
           <Route path="/reportes/admin" element={
             isAuthenticated ? <AdminReportes /> : <Navigate to="/" />
           } />
           <Route path="/reportes/gerson" element={
             isAuthenticated ? <GersonReportes /> : <Navigate to="/" />
           } />
-          
           <Route path="/reportes/login" element={<LoginReportes />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
