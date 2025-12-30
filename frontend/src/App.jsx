@@ -1,4 +1,4 @@
-﻿// src/App.jsx - VERSIÓN PARA DESARROLLO LOCAL
+﻿// src/App.jsx - VERSIÓN UNIVERSAL (desarrollo + producción)
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
@@ -15,9 +15,13 @@ import LoginReportes from './pages/reportes/LoginReportes.jsx';
 
 function App() {
   const isAuthenticated = true;
+  
+  // ✅ DETECTAR SI ESTAMOS EN GITHUB PAGES
+  const isGitHubPages = window.location.hostname === 'gasons30.github.io';
+  const basename = isGitHubPages ? '/la-perrada-pos' : '';
 
   return (
-    <Router>  {/* ← SIN basename para desarrollo */}
+    <Router basename={basename}>  {/* ✅ CON basename dinámico */}
       <div className="App">
         <Routes>
           <Route path="/" element={<POS />} />
@@ -29,12 +33,15 @@ function App() {
           
           <Route path="/productos" element={<Products />} />
           <Route path="/reportes" element={<Reportes />} />
-          <Route path="/reportes/admin" element={
+          
+          {/* ✅ RUTAS CORREGIDAS (sin /reportes/) */}
+          <Route path="/admin" element={
             isAuthenticated ? <AdminReportes /> : <Navigate to="/" />
           } />
-          <Route path="/reportes/gerson" element={
+          <Route path="/gerson" element={
             isAuthenticated ? <GersonReportes /> : <Navigate to="/" />
           } />
+          
           <Route path="/reportes/login" element={<LoginReportes />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
