@@ -56,7 +56,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
     const isGitHubPages = window.location.hostname.includes('github.io');
     const basePath = isGitHubPages ? '/la-perrada-pos' : '';
     
-    window.location.href = basePath + '/reportes';
+    window.location.href = basePath + '/';
     
     setTimeout(() => {
       window.location.reload(true);
