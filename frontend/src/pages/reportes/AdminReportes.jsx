@@ -4,7 +4,7 @@ import products from "../../data/products.js";
 import PDFGenerator from "../../components/PDFGenerator";
 import syncStorage from "../../firebase/storage.js";
 
-const AdminReportes = ({ usuario, onLogout }) => {
+const GersonReportes = ({ usuario, onLogout }) => {
   const [fechaSeleccionada, setFechaSeleccionada] = useState("");
   const [estadoCaja, setEstadoCaja] = useState("cerrada");
   const [fiados, setFiados] = useState([]);
@@ -15,8 +15,14 @@ const AdminReportes = ({ usuario, onLogout }) => {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [showDetalleFiado, setShowDetalleFiado] = useState(false);
   const [fiadoSeleccionado, setFiadoSeleccionado] = useState(null);
+  
   const [baseCaja, setBaseCaja] = useState(0);
-  const [baseCargada, setBaseCargada] = useState(false);
+  const [formattedBase, setFormattedBase] = useState("");
+  
+  const [topProductos, setTopProductos] = useState([]);
+  const [historialPDFs, setHistorialPDFs] = useState(() => {
+    return JSON.parse(localStorage.getItem("historialPDFs") || "[]");
+  });
   const [refreshKey, setRefreshKey] = useState(0);
   const [ultimaActualizacion, setUltimaActualizacion] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -42,6 +48,29 @@ const AdminReportes = ({ usuario, onLogout }) => {
     setFechaPagoFiado(hoy);
   }, []);
 
+  // 🔥 NUEVO CÓDIGO AQUÍ
+  useEffect(() => {
+    const eliminarBotonFlotante = () => {
+      const todosLosBotones = document.querySelectorAll('button');
+      
+      todosLosBotones.forEach(boton => {
+        const textoDelBoton = boton.textContent || boton.innerText || '';
+        const estilosDelBoton = boton.getAttribute('style') || '';
+        
+        if (textoDelBoton.includes('Cerrar Sesión') && 
+            estilosDelBoton.includes('position: fixed') &&
+            estilosDelBoton.includes('top: 20px')) {
+          boton.remove();
+          console.log('✅ Botón flotante eliminado');
+        }
+      });
+    };
+
+    eliminarBotonFlotante();
+    const intervalo = setInterval(eliminarBotonFlotante, 1000);
+    return () => clearInterval(intervalo);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
     localStorage.removeItem('fechaActiva');
@@ -50,7 +79,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
     const isGitHubPages = window.location.hostname.includes('github.io');
     const basePath = isGitHubPages ? '/la-perrada-pos' : '';
     
-    window.location.href = basePath + '/'; 
+    window.location.href = basePath + '/';
     
     setTimeout(() => {
       window.location.reload(true);
@@ -60,9 +89,11 @@ const AdminReportes = ({ usuario, onLogout }) => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        console.log("📥 AdminReportes: Cargando datos iniciales...");
+        console.log("📥 GersonReportes: Cargando datos iniciales...");
         
         const fecha = await syncStorage.getItem("fechaActiva");
+        console.log("📅 Fecha cargada de Firebase:", fecha);
+        
         if (fecha !== null && fecha !== undefined && fecha !== "") {
           setFechaSeleccionada(fecha);
           localStorage.setItem("fechaActiva", fecha);
@@ -79,6 +110,8 @@ const AdminReportes = ({ usuario, onLogout }) => {
         }
         
         const fiadosData = await syncStorage.getItem("fiados");
+        console.log("📦 Fiados cargados:", fiadosData, "Tipo:", typeof fiadosData);
+        
         if (fiadosData !== null && fiadosData !== undefined) {
           if (Array.isArray(fiadosData)) {
             setFiados(fiadosData);
@@ -98,6 +131,8 @@ const AdminReportes = ({ usuario, onLogout }) => {
         }
         
         const ventasData = await syncStorage.getItem("sales");
+        console.log("📊 Ventas cargadas:", ventasData, "Tipo:", typeof ventasData);
+        
         if (ventasData !== null && ventasData !== undefined) {
           if (Array.isArray(ventasData)) {
             setVentas(ventasData);
@@ -116,26 +151,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
           }
         }
         
-        console.log("📥 AdminReportes: Cargando base de caja desde Firebase...");
-        const baseData = await syncStorage.getItem("baseCaja");
-        
-        if (baseData !== null && baseData !== undefined) {
-          if (typeof baseData === 'object') {
-            if (baseData.fecha === fechaSeleccionada || !fechaSeleccionada) {
-              setBaseCaja(baseData.monto || 0);
-              setBaseCargada(true);
-              console.log("✅ Base cargada desde Firebase:", baseData.monto);
-            }
-          }
-        } else {
-          const saved = localStorage.getItem("baseCaja_" + fechaSeleccionada);
-          if (saved) {
-            setBaseCaja(parseInt(saved));
-            setBaseCargada(true);
-          }
-        }
-        
-        console.log("✅ AdminReportes: Datos iniciales cargados correctamente");
+        console.log("✅ GersonReportes: Datos iniciales cargados correctamente");
         setSincronizacionActiva(true);
         
       } catch (error) {
@@ -159,7 +175,24 @@ const AdminReportes = ({ usuario, onLogout }) => {
 
     loadInitialData();
 
+    const loadBaseFromFirebase = async () => {
+      try {
+        const baseData = await syncStorage.getItem("baseCaja");
+        if (baseData && typeof baseData === 'object' && baseData.fecha === fechaSeleccionada) {
+          setBaseCaja(baseData.monto || 0);
+          setFormattedBase(formatNumber(baseData.monto || 0));
+        }
+      } catch (error) {
+        console.error("Error cargando base de Firebase:", error);
+      }
+    };
+
+    if (fechaSeleccionada) {
+      loadBaseFromFirebase();
+    }
+
     const unsubscribeFecha = syncStorage.syncItem("fechaActiva", (newFecha) => {
+      console.log("🔄 Sincronización fecha activa:", newFecha);
       if (newFecha !== null && newFecha !== undefined) {
         setFechaSeleccionada(newFecha);
         localStorage.setItem("fechaActiva", newFecha);
@@ -168,6 +201,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
     });
 
     const unsubscribeEstado = syncStorage.syncItem("estadoCaja", (newEstado) => {
+      console.log("🔄 Sincronización estado caja:", newEstado);
       if (newEstado !== null && newEstado !== undefined) {
         setEstadoCaja(newEstado);
         localStorage.setItem("estadoCaja", newEstado);
@@ -176,6 +210,8 @@ const AdminReportes = ({ usuario, onLogout }) => {
     });
 
     const unsubscribeFiados = syncStorage.syncItem("fiados", (newFiados) => {
+      console.log("🔄 Sincronización fiados:", newFiados, "Tipo:", typeof newFiados);
+      
       if (newFiados !== null && newFiados !== undefined) {
         if (Array.isArray(newFiados)) {
           setFiados(newFiados);
@@ -191,6 +227,8 @@ const AdminReportes = ({ usuario, onLogout }) => {
     });
 
     const unsubscribeVentas = syncStorage.syncItem("sales", (newVentas) => {
+      console.log("🔄 Sincronización ventas:", newVentas, "Tipo:", typeof newVentas);
+      
       if (newVentas !== null && newVentas !== undefined) {
         if (Array.isArray(newVentas)) {
           setVentas(newVentas);
@@ -206,21 +244,18 @@ const AdminReportes = ({ usuario, onLogout }) => {
     });
 
     const unsubscribeBase = syncStorage.syncItem("baseCaja", (newBaseData) => {
-      console.log("🔄 AdminReportes: Sincronización base recibida:", newBaseData);
+      console.log("🔄 Gerson: Sincronización base recibida:", newBaseData);
       
-      if (newBaseData !== null && newBaseData !== undefined) {
-        if (typeof newBaseData === 'object') {
-          if (newBaseData.fecha === fechaSeleccionada) {
-            setBaseCaja(newBaseData.monto || 0);
-            setBaseCargada(true);
-            setRefreshKey(prev => prev + 1);
-            console.log("✅ Base actualizada desde Firebase:", newBaseData.monto);
-          }
-        }
+      if (newBaseData && typeof newBaseData === 'object' && newBaseData.fecha === fechaSeleccionada) {
+        setBaseCaja(newBaseData.monto || 0);
+        setFormattedBase(formatNumber(newBaseData.monto || 0));
+        setRefreshKey(prev => prev + 1);
+        console.log("✅ Base actualizada desde sincronización:", newBaseData.monto);
       }
     });
 
     return () => {
+      console.log("🧹 Limpiando listeners de GersonReportes.jsx");
       unsubscribeFecha?.();
       unsubscribeEstado?.();
       unsubscribeFiados?.();
@@ -271,7 +306,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
-    console.log("🔄 Refrescando datos manualmente...");
+    console.log("🔄 GersonReportes: Refrescando datos manualmente...");
     
     try {
       const fecha = await syncStorage.getItem("fechaActiva");
@@ -300,7 +335,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
       
       setRefreshKey(prev => prev + 1);
       setUltimaActualizacion(new Date());
-      console.log("✅ Datos refrescados correctamente");
+      console.log("✅ GersonReportes: Datos refrescados correctamente");
       
     } catch (error) {
       console.error("❌ Error refrescando datos:", error);
@@ -400,6 +435,35 @@ const AdminReportes = ({ usuario, onLogout }) => {
 
   const estadisticas = calcularEstadisticasCompletas(ventasPorDia);
 
+  useEffect(() => {
+    if (ventasPorDia.length > 0) {
+      const productosMap = {};
+      
+      ventasPorDia.forEach(venta => {
+        venta.items?.forEach(item => {
+          if (!productosMap[item.nombre]) {
+            productosMap[item.nombre] = {
+              nombre: item.nombre,
+              cantidad: 0,
+              total: 0,
+              precio: item.precio || 0
+            };
+          }
+          productosMap[item.nombre].cantidad += item.cantidad || 1;
+          productosMap[item.nombre].total += (item.precio || 0) * (item.cantidad || 1);
+        });
+      });
+      
+      const productosArray = Object.values(productosMap)
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 10);
+      
+      setTopProductos(productosArray);
+    } else {
+      setTopProductos([]);
+    }
+  }, [ventasPorDia, refreshKey]);
+
   const abrirCaja = async () => {
     if (!fechaSeleccionada) {
       alert("⚠ Selecciona una fecha antes de abrir caja.");
@@ -475,6 +539,311 @@ const AdminReportes = ({ usuario, onLogout }) => {
       setFechaSeleccionada("");
       
       alert(`📕 Caja cerrada (modo offline)\nFecha: ${fechaSeleccionada}\nTotal: $${estadisticas.totalVentas.toLocaleString()}`);
+    }
+  };
+
+  const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const handleBaseChange = (e) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    const num = parseInt(numericValue) || 0;
+    
+    setBaseCaja(num);
+    setFormattedBase(formatNumber(num));
+  };
+
+  const setBaseRapida = (monto) => {
+    setBaseCaja(monto);
+    setFormattedBase(formatNumber(monto));
+  };
+
+  const guardarBaseCaja = async () => {
+    if (!fechaSeleccionada) {
+      alert("Selecciona una fecha primero");
+      return;
+    }
+    
+    if (baseCaja <= 0) {
+      alert("⚠️ La base de caja debe ser mayor a $0");
+      return;
+    }
+    
+    localStorage.setItem("baseCaja_" + fechaSeleccionada, baseCaja.toString());
+    
+    try {
+      const baseData = {
+        fecha: fechaSeleccionada,
+        monto: baseCaja,
+        usuario: usuario?.nombre || 'GERSON',
+        timestamp: new Date().toISOString()
+      };
+      
+      await syncStorage.setItem("baseCaja", baseData);
+      console.log("✅ Base guardada en Firebase para sincronización:", baseData);
+      
+      alert(`💰 Base de caja guardada y sincronizada: $${baseCaja.toLocaleString()}\n\n✅ Admin verá esta base automáticamente.`);
+      refrescarDatos();
+      
+    } catch (error) {
+      console.error("❌ Error guardando base en Firebase:", error);
+      alert(`💰 Base de caja guardada localmente: $${baseCaja.toLocaleString()}\n⚠️ No se pudo sincronizar con Admin (modo offline)`);
+      refrescarDatos();
+    }
+  };
+
+  const eliminarVenta = async (index) => {
+    if (!window.confirm("¿Estás seguro de eliminar esta venta? Esta acción no se puede deshacer.")) {
+      return;
+    }
+
+    const ventaAEliminar = ventasPorDia[index];
+    const nuevasVentas = ventas.filter(v => {
+      const fechaVenta = new Date(v.fecha);
+      const año = fechaVenta.getFullYear();
+      const mes = String(fechaVenta.getMonth() + 1).padStart(2, '0');
+      const dia = String(fechaVenta.getDate()).padStart(2, '0');
+      const fechaFormateada = `${año}-${mes}-${dia}`;
+      
+      return !(fechaFormateada === fechaSeleccionada && 
+               v.mesa === ventaAEliminar.mesa && 
+               v.total === ventaAEliminar.total &&
+               JSON.stringify(v.items) === JSON.stringify(ventaAEliminar.items));
+    });
+
+    try {
+      console.log("🗑️ Eliminando venta:", ventaAEliminar);
+      await syncStorage.setItem("sales", nuevasVentas);
+      setVentas(nuevasVentas);
+      
+      localStorage.setItem("sales", JSON.stringify(nuevasVentas));
+      
+      setRefreshKey(prev => prev + 1);
+      setUltimaActualizacion(new Date());
+      
+      alert("✅ Venta eliminada correctamente");
+    } catch (error) {
+      console.error("❌ Error eliminando venta:", error);
+      localStorage.setItem("sales", JSON.stringify(nuevasVentas));
+      setVentas(nuevasVentas);
+      alert("✅ Venta eliminada (modo offline).");
+    }
+  };
+
+  const exportarCSV = () => {
+    if (ventasPorDia.length === 0) {
+      alert("No hay ventas para exportar");
+      return;
+    }
+
+    const headers = ["Fecha", "Cliente", "Tipo", "Método", "Total", "Efectivo", "Nequi", "Domicilio", "Productos"];
+    let csv = headers.join(",") + "\n";
+
+    ventasPorDia.forEach((venta, index) => {
+      const productos = venta.items?.map(item => 
+        `${item.nombre} x${item.cantidad || 1}`
+      ).join("; ") || "";
+
+      const row = [
+        venta.fecha?.split('T')[0] || fechaSeleccionada,
+        `"${venta.mesa || "Sin nombre"}"`,
+        venta.tipo || "normal",
+        venta.metodo,
+        venta.total,
+        venta.efectivo || 0,
+        venta.nequi || 0,
+        venta.domicilio || 0,
+        `"${productos}"`
+      ];
+
+      csv += row.join(",") + "\n";
+    });
+
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `ventas_${fechaSeleccionada}_${new Date().getTime()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    alert("📥 CSV exportado correctamente");
+  };
+
+  const generarPDFManual = () => {
+    if (ventasPorDia.length === 0) {
+      alert("⚠ No hay ventas para generar PDF");
+      return;
+    }
+
+    try {
+      console.log("📊 Preparando datos para PDF:", {
+        cantidadVentas: estadisticas.ventasCount,
+        total: estadisticas.totalVentas,
+        fecha: fechaSeleccionada
+      });
+
+      if (PDFGenerator && typeof PDFGenerator.generarReporteDiario === 'function') {
+        PDFGenerator.generarReporteDiario(ventasPorDia);
+        
+        const nuevoHistorial = [
+          ...historialPDFs,
+          {
+            id: Date.now(),
+            fecha: new Date().toISOString(),
+            tipo: "reporte_diario_gerencia",
+            datos: {
+              ...estadisticas,
+              fecha: fechaSeleccionada
+            }
+          }
+        ];
+        setHistorialPDFs(nuevoHistorial);
+        localStorage.setItem("historialPDFs", JSON.stringify(nuevoHistorial));
+
+        alert("✅ PDF generado correctamente");
+      } else {
+        console.error("ERROR: PDFGenerator.generarReporteDiario no encontrado");
+        generarPDFAlternativo();
+      }
+      
+    } catch (error) {
+      console.error("❌ Error generando PDF:", error);
+      alert(`Error al generar PDF: ${error.message}`);
+      generarPDFAlternativo();
+    }
+  };
+
+  const generarPDFAlternativo = () => {
+    try {
+      const contenido = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Reporte Diario Gerencia - ${fechaSeleccionada}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .header { background: linear-gradient(135deg, #2b2d42 0%, #4c6ef5 100%); color: white; padding: 20px; text-align: center; border-radius: 10px; }
+            .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+            .kpi { display: flex; justify-content: space-between; margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px; }
+            .total { font-size: 18px; font-weight: bold; color: #2b8a3e; }
+            .resumen-item { display: flex; justify-content: space-between; margin: 8px 0; }
+            .resumen-label { font-weight: bold; }
+            .resumen-value { font-weight: bold; }
+            .ganancia { color: #2b8a3e; font-size: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>⭐ REPORTE DIARIO GERENCIA</h1>
+            <h3>La Perrada de Piter</h3>
+            <p>Fecha: ${fechaSeleccionada} • Generado: ${new Date().toLocaleString()}</p>
+          </div>
+          
+          <div class="section">
+            <h2>📊 RESUMEN FINANCIERO CORREGIDO</h2>
+            
+            <div class="resumen-item">
+              <span class="resumen-label">Base de Caja:</span>
+              <span class="resumen-value">$${estadisticas.baseCaja.toLocaleString()}</span>
+            </div>
+            
+            <div class="resumen-item">
+              <span class="resumen-label">Efectivo Recaudado:</span>
+              <span class="resumen-value">$${estadisticas.efectivoRecaudado.toLocaleString()}</span>
+            </div>
+            
+            <div class="resumen-item">
+              <span class="resumen-label">Nequi Recaudado:</span>
+              <span class="resumen-value">$${estadisticas.nequiRecaudado.toLocaleString()}</span>
+            </div>
+            
+            <div class="resumen-item">
+              <span class="resumen-label">Total Domicilios:</span>
+              <span class="resumen-value">$${estadisticas.totalDomicilios.toLocaleString()}</span>
+            </div>
+            
+            <div class="resumen-item">
+              <span class="resumen-label">Total Ventas:</span>
+              <span class="resumen-value total">$${estadisticas.totalVentas.toLocaleString()}</span>
+            </div>
+            
+            <div class="resumen-item">
+              <span class="resumen-label">Saldo en Caja:</span>
+              <span class="resumen-value ganancia">$${estadisticas.saldoCaja.toLocaleString()}</span>
+            </div>
+            
+            <div class="resumen-item">
+              <span class="resumen-label">Ganancia del Día:</span>
+              <span class="resumen-value ganancia">$${estadisticas.gananciaDia.toLocaleString()}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h2>📈 ESTADÍSTICAS</h2>
+            <p>Total de ventas: ${estadisticas.ventasCount}</p>
+            <p>Domicilios entregados: ${ventasPorDia.filter(v => v.domicilio > 0 && v.tipo !== "fiado").length}</p>
+            <p>Promedio por venta: $${Math.round(estadisticas.promedioVenta).toLocaleString()}</p>
+          </div>
+          
+          <div class="section">
+            <h3>📞 Información de contacto</h3>
+            <p>📍 Cra. 16 #12-11 Barrio Once de Noviembre, Ciénaga de Oro</p>
+            <p>📱 Tel: 302 207 5484 - Domicilios</p>
+            <p>💳 Nequi: 304 649 2391 - Gerson Soto</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const ventana = window.open('', '_blank');
+      ventana.document.write(contenido);
+      ventana.document.close();
+      ventana.print();
+      
+    } catch (error) {
+      console.error("Error en PDF alternativo:", error);
+      alert("Generando reporte en formato texto...\n\n" +
+            `Fecha: ${fechaSeleccionada}\n` +
+            `Base de Caja: $${estadisticas.baseCaja.toLocaleString()}\n` +
+            `Efectivo Recaudado: $${estadisticas.efectivoRecaudado.toLocaleString()}\n` +
+            `Nequi Recaudado: $${estadisticas.nequiRecaudado.toLocaleString()}\n` +
+            `Saldo en Caja: $${estadisticas.saldoCaja.toLocaleString()}\n` +
+            `Ganancia del Día: $${estadisticas.gananciaDia.toLocaleString()}\n` +
+            `Total Ventas: ${estadisticas.ventasCount}`);
+    }
+  };
+
+  const verHistorialPDFs = () => {
+    if (historialPDFs.length === 0) {
+      alert("📭 No hay PDFs en el historial. Genera uno primero usando el botón 'Generar PDF del Día'.");
+      return;
+    }
+
+    const historialFormateado = historialPDFs.map((pdf, idx) => {
+      const fecha = new Date(pdf.fecha);
+      const numero = idx + 1;
+      const tipo = pdf.tipo === 'reporte_diario_gerencia' ? '📊 Reporte Diario' : '📄 PDF';
+      const total = pdf.datos?.totalVentas ? ` - $${pdf.datos.totalVentas.toLocaleString()}` : '';
+      
+      return `${numero}. ${tipo}${total}\n   📅 ${fecha.toLocaleDateString()} 🕒 ${fecha.toLocaleTimeString()}`;
+    }).join('\n\n');
+
+    const confirmacion = confirm(
+      `📋 HISTORIAL DE PDFs (${historialPDFs.length} archivos)\n\n` +
+      historialFormateado +
+      `\n\n¿Deseas limpiar el historial completo?`
+    );
+    
+    if (confirmacion) {
+      setHistorialPDFs([]);
+      localStorage.setItem("historialPDFs", JSON.stringify([]));
+      alert("✅ Historial limpiado correctamente");
+      refrescarDatos();
     }
   };
 
@@ -815,10 +1184,12 @@ const AdminReportes = ({ usuario, onLogout }) => {
       `}</style>
 
       {/* HEADER */}
-      <div className="reportes-header">
+      <div className="reportes-header" style={{background: "linear-gradient(135deg, #2b2d42 0%, #4c6ef5 100%)"}}>
         <div>
-          <h1>📊 PANEL ADMINISTRADOR</h1>
-          <p className="fecha">{fechaSeleccionada ? formatearFecha(fechaSeleccionada) : "Selecciona una fecha"}</p>
+          <h1 style={{color: "white", WebkitTextFillColor: "white"}}>⭐ GERENCIA (GERSON)</h1>
+          <p className="fecha" style={{color: "#adb5bd"}}>
+            {fechaSeleccionada ? formatearFecha(fechaSeleccionada) : "Selecciona una fecha"}
+          </p>
           <div className="flex gap-2 mt-2 flex-wrap">
             <button 
               onClick={() => {
@@ -827,6 +1198,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
                 window.location.href = basePath + '/';
               }}
               className="back-pos-btn"
+              style={{background: "rgba(255,255,255,0.1)", color: "white", borderColor: "white"}}
             >
               ← Volver al POS
             </button>
@@ -838,29 +1210,121 @@ const AdminReportes = ({ usuario, onLogout }) => {
             }`}>
               {estadoCaja === "abierta" ? "📦 Caja ABIERTA" : "📕 Caja CERRADA"}
             </div>
+
+            <button
+              onClick={generarPDFManual}
+              className="px-3 py-1 rounded-lg font-bold text-sm bg-purple-100 text-purple-800 border border-purple-300 hover:bg-purple-200 transition-colors"
+              disabled={ventasPorDia.length === 0}
+            >
+              📄 Generar Reporte PDF
+            </button>
           </div>
         </div>
         
         <div className="user-info">
-          <span>👤 {usuario?.nombre || 'Administrador'}</span>
+          <span style={{background: "rgba(255,255,255,0.15)", color: "white", borderColor: "rgba(255,255,255,0.3)"}}>
+            👑 GERENTE: {usuario?.nombre || 'GERSON'}
+          </span>
           <button onClick={handleLogout} className="logout-btn">
             Cerrar Sesión
           </button>
         </div>
       </div>
 
-      {/* CONTROL DE FECHA */}
-      <div className="section-card">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <span className="text-blue-600">📅</span>
-          Fecha para Reportes
-        </h2>
+      {/* BASE DE CAJA */}
+      <div className="section-card gerencia-section">
+        <div className="section-header-gerencia">
+          <h2>💰 BASE DE CAJA (Dinero Inicial)</h2>
+          <span className="gerencia-badge">EXCLUSIVO GERENCIA</span>
+        </div>
         
+        <div className="base-caja-container">
+          <div className="flex gap-3 items-center">
+            <div className="space-y-3">
+              <div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="input-field"
+                  placeholder="Ej: 50.000"
+                  value={formattedBase}
+                  onChange={handleBaseChange}
+                  style={{maxWidth: "300px", fontSize: "18px"}}
+                />
+                <div className="text-xs text-gray-500 mt-1">
+                  💡 Usa el teclado numérico en móvil
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <button 
+                  onClick={() => setBaseRapida(10000)}
+                  className={`px-3 py-2 rounded-lg ${baseCaja === 10000 ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'}`}
+                >
+                  $10.000
+                </button>
+                <button 
+                  onClick={() => setBaseRapida(50000)}
+                  className={`px-3 py-2 rounded-lg ${baseCaja === 50000 ? 'bg-green-600 text-white' : 'bg-green-100 text-green-800'}`}
+                >
+                  $50.000
+                </button>
+                <button 
+                  onClick={() => setBaseRapida(100000)}
+                  className={`px-3 py-2 rounded-lg ${baseCaja === 100000 ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-800'}`}
+                >
+                  $100.000
+                </button>
+                <button 
+                  onClick={() => setBaseRapida(0)}
+                  className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+            
+            <button
+              onClick={guardarBaseCaja}
+              className="btn btn-success"
+              disabled={!fechaSeleccionada}
+            >
+              💾 Guardar Base
+            </button>
+          </div>
+          
+          {baseCaja > 0 && (
+            <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="font-bold text-green-700">✅ Base lista para guardar:</div>
+                  <div className="text-2xl font-bold text-green-900">${baseCaja.toLocaleString()}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-600">Para fecha:</div>
+                  <div className="font-semibold">{fechaSeleccionada}</div>
+                </div>
+              </div>
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-xs text-blue-800">
+                  💡 <strong>Esta base se sincronizará automáticamente con Admin</strong><br/>
+                  Al guardar, Admin verá inmediatamente: <strong>${baseCaja.toLocaleString()}</strong>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CONTROL DE CAJA */}
+      <div className="section-card">
+        <h2>📅 Control de Caja</h2>
         <div className="space-y-4">
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
             <div className="flex-1">
               <label className="block font-semibold text-gray-700 mb-2">
-                Seleccionar fecha para filtrar reportes:
+                Fecha para reportes:
               </label>
               <input
                 type="date"
@@ -891,7 +1355,7 @@ const AdminReportes = ({ usuario, onLogout }) => {
           <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-blue-700 text-sm">
               💡 Esta fecha determina qué ventas se muestran en los reportes. 
-              Puedes cambiarla en cualquier momento, incluso si la caja está abierta.
+              Puedes cambiarla en cualquier momento.
             </p>
           </div>
         </div>
@@ -913,54 +1377,17 @@ const AdminReportes = ({ usuario, onLogout }) => {
             📕 Cerrar Caja
           </button>
         </div>
-      </div>
-
-      {/* ✅ SECCIÓN BASE DE CAJA - SOLO LECTURA */}
-      <div className="section-card">
-        <h2>💰 Base de Caja</h2>
         
-        <div className="space-y-4">
-          {baseCargada && baseCaja > 0 ? (
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-blue-700">Base establecida por Gerencia:</div>
-                  <div className="text-2xl font-bold text-blue-900">${baseCaja.toLocaleString()}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-600">Para fecha:</div>
-                  <div className="font-semibold">{fechaSeleccionada}</div>
-                </div>
-              </div>
-              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                <p className="text-xs text-yellow-800">
-                  ⚠️ Solo Gerencia (Gerson) puede modificar la base de caja.
-                  Contacta al gerente para cambios.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-yellow-700">Base de caja no establecida</div>
-                  <div className="text-sm text-yellow-600 mt-1">
-                    La gerencia (Gerson) debe establecer la base de caja para esta fecha.
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-600">Para fecha:</div>
-                  <div className="font-semibold">{fechaSeleccionada}</div>
-                </div>
-              </div>
-              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                <p className="text-xs text-blue-800">
-                  💡 Los cálculos se mostrarán con base $0 hasta que Gerencia establezca el monto.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+        {estadoCaja === "abierta" && (
+          <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <p className="text-sm text-yellow-800 font-semibold">
+              ⚠️ La caja está ABIERTA. Cierre la caja para cambiar de fecha.
+            </p>
+            <p className="text-xs text-yellow-600 mt-1">
+              Ventas registradas hoy: ${estadisticas.ventasCount} • Total: $${estadisticas.totalVentas.toLocaleString()}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ✅ KPI CORREGIDOS */}
@@ -985,38 +1412,182 @@ const AdminReportes = ({ usuario, onLogout }) => {
         </div>
         
         <div className="kpi-card">
-          <div className="kpi-label">NEQUI RECAUDADO</div>
-          <div className="kpi-value">${estadisticas.nequiRecaudado.toLocaleString()}</div>
-          <div className="kpi-trend">
-            Transferencias digitales
-          </div>
-        </div>
-        
-        <div className="kpi-card">
-          <div className="kpi-label">SALDO EN CAJA</div>
+          <div className="kpi-label">SALDO CAJA</div>
           <div className="kpi-value">${estadisticas.saldoCaja.toLocaleString()}</div>
           <div className="kpi-trend">
             Base + Efectivo recaudado
           </div>
         </div>
+        
+        <div className="kpi-card">
+          <div className="kpi-label">GANANCIA DÍA</div>
+          <div className="kpi-value">${estadisticas.gananciaDia.toLocaleString()}</div>
+          <div className="kpi-trend">
+            {ventasPorDia.filter(v => v.domicilio > 0 && v.tipo !== "fiado").length} domicilios
+          </div>
+        </div>
       </div>
 
-      {/* 🔧 CORRECCIÓN 3: ELIMINADA SECCIÓN "📊 Resumen Financiero (Cálculos Corregidos)" */}
+      {/* 🔥 RESUMEN FINANCIERO CORREGIDO */}
+      <div className="section-card gerencia-section resumen-financiero">
+        <div className="section-header-gerencia">
+          <h2>📊 RESUMEN FINANCIERO COMPLETO (CÁLCULOS CORREGIDOS)</h2>
+          <span className="gerencia-badge">EXCLUSIVO GERENCIA</span>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="resumen-item">
+            <div className="resumen-label">Base de Caja Inicial</div>
+            <div className="resumen-value">${estadisticas.baseCaja.toLocaleString()}</div>
+          </div>
+          
+          <div className="resumen-item">
+            <div className="resumen-label">Efectivo Recaudado Hoy</div>
+            <div className="resumen-value text-green-600">+${estadisticas.efectivoRecaudado.toLocaleString()}</div>
+          </div>
+          
+          <div className="resumen-item">
+            <div className="resumen-label">Nequi Recaudado Hoy</div>
+            <div className="resumen-value text-purple-600">+${estadisticas.nequiRecaudado.toLocaleString()}</div>
+          </div>
+          
+          <div className="resumen-item">
+            <div className="resumen-label">Total Domicilios (Normales)</div>
+            <div className="resumen-value">+${estadisticas.totalDomicilios.toLocaleString()}</div>
+            <div className="text-xs text-gray-500">
+              Excluye domicilios de fiados pagados
+            </div>
+          </div>
+          
+          <div className="border-t pt-4 mt-4">
+            <div className="resumen-item total">
+              <div className="resumen-label">TOTAL VENTAS DEL DÍA</div>
+              <div className="resumen-value text-2xl font-black text-blue-600">
+                ${estadisticas.totalVentas.toLocaleString()}
+              </div>
+            </div>
+          </div>
+          
+          <div className="border-t pt-4 mt-4">
+            <div className="resumen-item ganancia">
+              <div className="resumen-label">SALDO ACTUAL EN CAJA</div>
+              <div className="resumen-value text-2xl font-black text-green-700">
+                ${estadisticas.saldoCaja.toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-500 mt-1">
+                (Base ${estadisticas.baseCaja.toLocaleString()} + Efectivo ${estadisticas.efectivoRecaudado.toLocaleString()})
+              </div>
+            </div>
+          </div>
+          
+          <div className="border-t pt-4 mt-4">
+            <div className="resumen-item ganancia">
+              <div className="resumen-label">GANANCIA DEL DÍA</div>
+              <div className="resumen-value text-2xl font-black text-emerald-700">
+                ${estadisticas.gananciaDia.toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-500 mt-1">
+                (Total de ventas realizadas hoy - incluidos fiados pagados)
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-blue-700 text-sm">
+            💡 <strong>Explicación de la corrección:</strong> Los fiados pagados se contabilizan como ventas normales, 
+            pero sus domicilios NO se suman al "Total Domicilios". Solo los domicilios de ventas normales del día 
+            se contabilizan aquí.
+          </p>
+        </div>
+        
+        <div className="resumen-export">
+          <button
+            onClick={generarPDFManual}
+            className="btn btn-purple"
+            disabled={ventasPorDia.length === 0}
+          >
+            📄 Generar PDF del Día
+          </button>
+          
+          <button
+            onClick={verHistorialPDFs}
+            className="btn btn-gray"
+          >
+            📋 Ver Historial de PDFs
+          </button>
+          
+          <button
+            onClick={exportarCSV}
+            className="btn btn-blue"
+            disabled={ventasPorDia.length === 0}
+          >
+            📥 Exportar CSV
+          </button>
+        </div>
+      </div>
+
+      {/* TOP PRODUCTOS */}
+      <div className="section-card gerencia-section">
+        <div className="section-header-gerencia">
+          <h2>🏆 TOP 10 PRODUCTOS MÁS VENDIDOS</h2>
+          <span className="gerencia-badge">EXCLUSIVO GERENCIA</span>
+        </div>
+        
+        {topProductos.length === 0 ? (
+          <p className="text-center text-gray-500 py-4">
+            No hay datos de ventas para mostrar el top de productos
+          </p>
+        ) : (
+          <div className="top-productos-grid">
+            {topProductos.map((producto, index) => (
+              <div key={index} className="top-producto-card">
+                <div className="top-producto-rank">
+                  <span className={`rank-number rank-${index + 1}`}>
+                    {index + 1}
+                  </span>
+                </div>
+                
+                <div className="top-producto-info">
+                  <div className="top-producto-nombre">{producto.nombre}</div>
+                  <div className="top-producto-details">
+                    <span className="top-producto-cantidad">
+                      📦 {producto.cantidad} unidades
+                    </span>
+                    <span className="top-producto-total">
+                      💰 ${producto.total.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="top-producto-precio-unitario">
+                  ${producto.precio.toLocaleString()} c/u
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="mt-4 text-xs text-gray-500 text-center">
+          ⌛ Actualizado: ${formatearHora(ultimaActualizacion)}
+          {isRefreshing && <span className="ml-2">🔄 Actualizando...</span>}
+        </div>
+      </div>
 
       {/* VENTAS DEL DÍA */}
       <div className="section-card">
         <div className="flex justify-between items-center mb-4">
           <h2>📋 Ventas del Día</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex gap-2">
             <span className="text-sm text-gray-600">
               {estadisticas.ventasCount} ventas • ${estadisticas.totalVentas.toLocaleString()}
             </span>
             <button
-              onClick={refrescarDatos}
-              className="text-sm bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded flex items-center gap-1"
-              disabled={isRefreshing}
+              onClick={exportarCSV}
+              className="btn btn-blue btn-sm"
+              disabled={ventasPorDia.length === 0}
             >
-              {isRefreshing ? '🔄' : '🔃'} Actualizar
+              📥 Exportar CSV
             </button>
           </div>
         </div>
@@ -1029,9 +1600,12 @@ const AdminReportes = ({ usuario, onLogout }) => {
           <div className="ventas-cuadro-container">
             <div className="ventas-cuadro-header">
               <div className="ventas-cuadro-col-cliente">Cliente</div>
+              <div className="ventas-cuadro-col-tipo">Tipo</div>
               <div className="ventas-cuadro-col-metodo">Método</div>
               <div className="ventas-cuadro-col-total">Total</div>
+              <div className="ventas-cuadro-col-detalle">Detalle Pago</div>
               <div className="ventas-cuadro-col-productos">Productos</div>
+              <div className="ventas-cuadro-col-acciones">Acciones</div>
             </div>
             
             <div className="ventas-cuadro-scroll">
@@ -1042,8 +1616,13 @@ const AdminReportes = ({ usuario, onLogout }) => {
                     {venta.domicilio > 0 && (
                       <span className="venta-cuadro-domicilio">🚚</span>
                     )}
-                    {venta.tipo === "fiado" && (
-                      <span className="venta-cuadro-fiado">📋 Fiado</span>
+                  </div>
+                  
+                  <div className="ventas-cuadro-col-tipo">
+                    {venta.tipo === "fiado" ? (
+                      <span className="badge badge-purple">Fiado</span>
+                    ) : (
+                      <span className="badge badge-green">Normal</span>
                     )}
                   </div>
                   
@@ -1057,11 +1636,19 @@ const AdminReportes = ({ usuario, onLogout }) => {
                     <span className="venta-cuadro-total">
                       ${venta.total?.toLocaleString() || "0"}
                     </span>
-                    {venta.metodo === "mixto" && (
-                      <div className="text-xs text-gray-500">
-                        💵 ${venta.efectivo?.toLocaleString() || "0"} + 📱 ${venta.nequi?.toLocaleString() || "0"}
+                  </div>
+                  
+                  <div className="ventas-cuadro-col-detalle">
+                    {venta.metodo === "mixto" ? (
+                      <div className="text-xs">
+                        <div>💵 ${venta.efectivo?.toLocaleString() || "0"}</div>
+                        <div>📱 ${venta.nequi?.toLocaleString() || "0"}</div>
                       </div>
-                    )}
+                    ) : venta.metodo === "efectivo" ? (
+                      <div className="text-xs text-green-600">💵 ${venta.total?.toLocaleString() || "0"}</div>
+                    ) : venta.metodo === "nequi" ? (
+                      <div className="text-xs text-purple-600">📱 ${venta.total?.toLocaleString() || "0"}</div>
+                    ) : "-"}
                   </div>
                   
                   <div className="ventas-cuadro-col-productos">
@@ -1076,6 +1663,16 @@ const AdminReportes = ({ usuario, onLogout }) => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                  
+                  <div className="ventas-cuadro-col-acciones">
+                    <button
+                      onClick={() => eliminarVenta(index)}
+                      className="producto-eliminar-btn"
+                      title="Eliminar esta venta"
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1371,35 +1968,6 @@ const AdminReportes = ({ usuario, onLogout }) => {
                   )}
                 </div>
               )}
-              
-              {productosFiado.length > 0 && (
-                <div className="mt-6 border-t pt-4">
-                  <h4 className="font-bold mb-2">Productos seleccionados ({productosFiado.length}):</h4>
-                  <div className="max-h-40 overflow-y-auto space-y-2">
-                    {productosFiado.map((prod, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{getName(prod)}</span>
-                          <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">
-                            x{prod.cantidad || 1}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">
-                            ${(getPrice(prod) * (prod.cantidad || 1)).toLocaleString()}
-                          </span>
-                          <button
-                            onClick={() => eliminarProductoFiado(idx)}
-                            className="text-red-500 hover:text-red-700 text-sm transition-colors"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             
             <div className="modal-footer">
@@ -1656,4 +2224,4 @@ const AdminReportes = ({ usuario, onLogout }) => {
   );
 };
 
-export default AdminReportes;
+export default GersonReportes;

@@ -48,6 +48,29 @@ const GersonReportes = ({ usuario, onLogout }) => {
     setFechaPagoFiado(hoy);
   }, []);
 
+  // 🔥 NUEVO CÓDIGO AQUÍ
+  useEffect(() => {
+    const eliminarBotonFlotante = () => {
+      const todosLosBotones = document.querySelectorAll('button');
+      
+      todosLosBotones.forEach(boton => {
+        const textoDelBoton = boton.textContent || boton.innerText || '';
+        const estilosDelBoton = boton.getAttribute('style') || '';
+        
+        if (textoDelBoton.includes('Cerrar Sesión') && 
+            estilosDelBoton.includes('position: fixed') &&
+            estilosDelBoton.includes('top: 20px')) {
+          boton.remove();
+          console.log('✅ Botón flotante eliminado');
+        }
+      });
+    };
+
+    eliminarBotonFlotante();
+    const intervalo = setInterval(eliminarBotonFlotante, 1000);
+    return () => clearInterval(intervalo);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('reportes_usuario');
     localStorage.removeItem('fechaActiva');
