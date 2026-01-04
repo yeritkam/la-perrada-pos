@@ -1,4 +1,4 @@
-// src/pages/POS.jsx - VERSIÓN FINAL CORREGIDA CON DOMICILIOS FUNCIONALES
+// src/pages/POS.jsx - VERSIÓN FINAL CON EDICIÓN DE PEDIDOS EN COCINA
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import products from "../data/products.js";
@@ -311,6 +311,39 @@ export default function POS() {
     return '/logo.png';
   };
 
+  // ✅ NUEVA FUNCIÓN: Abrir modal para editar pedido EN COCINA
+  const abrirEditarPedido = (mesaIndex) => {
+    const mesa = mesas[mesaIndex];
+    
+    if (!mesa || mesa.estado !== "espera") {
+      alert("Solo puedes editar pedidos que están EN COCINA (estado: espera)");
+      return;
+    }
+    
+    if (mesa.items.length === 0) {
+      alert("No hay productos para editar en esta mesa");
+      return;
+    }
+    
+    // 1. Cerrar modal de ver pedido
+    setShowMesaPedido(false);
+    
+    // 2. Seleccionar la mesa para editar
+    setMesaActual(mesaIndex);
+    
+    // 3. Cargar los productos en ordenTemporal para editar
+    setOrdenTemporal(mesa.items.map(item => ({
+      ...item,
+      cantidad: item.cantidad || 1,
+      nota: item.nota || ""
+    })));
+    
+    // 4. Abrir modal de productos para editar
+    setShowMenuSeleccion(true);
+    
+    alert("📝 Modo edición activado. Modifica los productos y haz clic en 'Enviar a Cocina' para actualizar.");
+  };
+
   // GUARDAR MESAS
   const saveMesas = async (nuevasMesas) => {
     try {
@@ -565,7 +598,7 @@ export default function POS() {
     await saveMesas(nuevasMesas);
   };
 
-  // ENVIAR A COCINA
+  // ✅ ENVIAR A COCINA - MODIFICADA PARA SOPORTAR EDICIÓN
   const enviarACocina = async () => {
     if (mesaActual === null) return alert("Selecciona una mesa primero");
     if (ordenTemporal.length === 0) return alert("No hay productos para enviar.");
@@ -578,35 +611,50 @@ export default function POS() {
       nota: p.nota || "",
     }));
 
-    const itemsActuales = [...(mesas[mesaActual]?.items || [])];
+    const isEditing = mesas[mesaActual]?.estado === "espera";
     
-    productosParaEnviar.forEach(nuevoProducto => {
-      const existingIndex = itemsActuales.findIndex(item => item.id === nuevoProducto.id);
+    let itemsActuales = [];
+    if (isEditing) {
+      // ✅ EDITANDO: Reemplazar todos los productos
+      itemsActuales = [...productosParaEnviar];
+    } else {
+      // ✅ NUEVO PEDIDO: Sumar a productos existentes
+      itemsActuales = [...(mesas[mesaActual]?.items || [])];
       
-      if (existingIndex >= 0) {
-        itemsActuales[existingIndex].cantidad += nuevoProducto.cantidad;
-      } else {
-        itemsActuales.push({
-          ...nuevoProducto,
-          cantidad: nuevoProducto.cantidad || 1
-        });
-      }
-    });
+      productosParaEnviar.forEach(nuevoProducto => {
+        const existingIndex = itemsActuales.findIndex(item => item.id === nuevoProducto.id);
+        
+        if (existingIndex >= 0) {
+          itemsActuales[existingIndex].cantidad += nuevoProducto.cantidad;
+        } else {
+          itemsActuales.push({
+            ...nuevoProducto,
+            cantidad: nuevoProducto.cantidad || 1
+          });
+        }
+      });
+    }
 
     const nuevasMesas = [...mesas];
     nuevasMesas[mesaActual] = {
       ...nuevasMesas[mesaActual],
       items: itemsActuales,
       estado: "espera",
-      pedidoNumero: (nuevasMesas[mesaActual].pedidoNumero || 0) + 1,
-      timestamp: Date.now()
+      pedidoNumero: isEditing ? (nuevasMesas[mesaActual].pedidoNumero || 1) : 
+                  (nuevasMesas[mesaActual].pedidoNumero || 0) + 1,
+      timestamp: isEditing ? nuevasMesas[mesaActual].timestamp : Date.now() // ✅ Mantener timestamp original si es edición
     };
     
     await saveMesas(nuevasMesas);
     
     setOrdenTemporal([]);
+    setShowMenuSeleccion(false);
     
-    alert(`✅ Pedido enviado a cocina (${calcularProductosUnicos()} productos)`);
+    const mensaje = isEditing 
+      ? `✅ Pedido actualizado en cocina (${calcularProductosUnicos()} productos)`
+      : `✅ Pedido enviado a cocina (${calcularProductosUnicos()} productos)`;
+    
+    alert(mensaje);
   };
 
   // CORREGIDO: Calcular total de una mesa incluyendo domicilio
@@ -1783,7 +1831,7 @@ export default function POS() {
         </div>
       )}
 
-      {/* MODAL DE PEDIDO DE MESA - CORREGIDO PARA MOSTRAR DOMICILIO */}
+      {/* MODAL DE PEDIDO DE MESA - CORREGIDO PARA MOSTRAR DOMICILIO Y BOTÓN DE EDICIÓN */}
       {showMesaPedido && mesaSeleccionadaPedido !== null && (
         <div className="modal-overlay">
           <div className="modal-content-large">
@@ -1887,7 +1935,27 @@ export default function POS() {
               )}
             </div>
             
+            {/* ✅ NUEVO: BOTÓN PARA EDITAR PEDIDO EN COCINA */}
             <div className="modal-footer mt-6 pt-6 border-t border-gray-200">
+              {mesas[mesaSeleccionadaPedido]?.estado === "espera" && (
+                <div className="flex gap-3 justify-center mb-4">
+                  <button
+                    onClick={() => abrirEditarPedido(mesaSeleccionadaPedido)}
+                    className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-bold hover:from-yellow-600 hover:to-orange-600 transition-all"
+                  >
+                    ✏️ Editar Pedido
+                  </button>
+                </div>
+              )}
+              
+              {/* ✅ INFO: Solo pedidos EN COCINA pueden editarse */}
+              {mesas[mesaSeleccionadaPedido]?.estado === "espera" && (
+                <div className="text-center text-sm text-gray-600 mb-4">
+                  ⚡ <strong>Pedido en cocina</strong> - Puedes modificar productos antes de preparar
+                </div>
+              )}
+              
+              {/* Botón Cerrar */}
               <div className="flex justify-center">
                 <button
                   onClick={cerrarModalPedidoMesa}
