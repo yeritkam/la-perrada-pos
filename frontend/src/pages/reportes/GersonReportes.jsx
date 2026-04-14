@@ -32,6 +32,24 @@ const GersonReportes = ({ usuario, onLogout }) => {
   const [fiadoParaAgregar, setFiadoParaAgregar] = useState(null);
   const [productosNuevos, setProductosNuevos] = useState([]);
 
+  // Estados para el modal de método de pago al dividir cuenta
+  const [showModalMetodoPagoPersona, setShowModalMetodoPagoPersona] = useState(false);
+  const [personaPendiente, setPersonaPendiente] = useState(null);
+  const [metodoPagoPersona, setMetodoPagoPersona] = useState("efectivo");
+  const [efectivoPersona, setEfectivoPersona] = useState(0);
+  const [nequiPersona, setNequiPersona] = useState(0);
+
+  // Estados para división de cuentas (deben estar definidos)
+  const [mesaActual, setMesaActual] = useState(null);
+  const [personasDividir, setPersonasDividir] = useState(2);
+  const [productosAsignados, setProductosAsignados] = useState({});
+  const [pagosRealizados, setPagosRealizados] = useState({});
+  const [showPagoIndividual, setShowPagoIndividual] = useState(false);
+  const [personaAPagar, setPersonaAPagar] = useState(1);
+  const [fechaActiva, setFechaActivaLocal] = useState(() => {
+    return localStorage.getItem("fechaActiva") || "";
+  });
+
   const [nuevoFiado, setNuevoFiado] = useState({ nombre: "", celular: "", fechaFiado: "" });
 
   useEffect(() => {
@@ -142,7 +160,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
     finally { setTimeout(() => setIsRefreshing(false), 500); }
   }, [isRefreshing]);
 
-  // ✅ FUNCIÓN CORREGIDA: Calcular estadísticas
   const calcularEstadisticas = (ventasPorDia) => {
     let totalVentas = 0;
     let efectivo = 0;
@@ -154,15 +171,10 @@ const GersonReportes = ({ usuario, onLogout }) => {
       const totalVenta = parseInt(v.total) || 0;
       const domicilio = parseInt(v.domicilio) || 0;
       
-      // Sumar domicilios por separado (solo el costo de envío)
       totalDomicilios += domicilio;
-      
-      // Para el total de ventas del día: productos + domicilios
       totalVentas += totalVenta + domicilio;
-      
       count++;
       
-      // Calcular métodos de pago
       const totalPagar = totalVenta + domicilio;
       switch(v.metodo) {
         case 'efectivo':
@@ -206,20 +218,15 @@ const GersonReportes = ({ usuario, onLogout }) => {
 
   const stats = calcularEstadisticas(ventasPorDia);
 
-  // ✅ FUNCIÓN PARA ELIMINAR VENTA
   const eliminarVenta = async (index) => {
     if (!window.confirm("¿Estás seguro de eliminar esta venta? Esta acción no se puede deshacer.")) {
       return;
     }
 
     const ventaAEliminar = ventasPorDia[index];
-    
-    // Filtrar las ventas para eliminar la seleccionada
     const nuevasVentas = ventas.filter(v => {
-      // Comparar si es la misma venta
       const fechaVenta = v.fecha?.split('T')[0] || "";
       const fechaSeleccionadaVenta = fechaSeleccionada;
-      
       return !(fechaVenta === fechaSeleccionadaVenta && 
                v.mesa === ventaAEliminar.mesa && 
                v.total === ventaAEliminar.total &&
@@ -273,7 +280,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
     } catch (error) { alert(`Base guardada localmente: $${baseCaja.toLocaleString()}`); refrescarDatos(); }
   };
 
-  // FUNCIÓN EXPORTAR CSV
   const exportarCSV = () => {
     if (ventasPorDia.length === 0) {
       alert("No hay ventas para exportar");
@@ -316,7 +322,6 @@ const GersonReportes = ({ usuario, onLogout }) => {
     alert("📥 CSV exportado correctamente");
   };
 
-  // FUNCIÓN GENERAR PDF MANUAL
   const generarPDFManual = () => {
     if (ventasPorDia.length === 0) {
       alert("⚠ No hay ventas para generar PDF");
@@ -361,7 +366,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <p>Efectivo Recaudado: $${stats.efectivo.toLocaleString()}</p>
           <p>Nequi Recaudado: $${stats.nequi.toLocaleString()}</p>
           <p>Total Domicilios: $${stats.totalDomicilios.toLocaleString()}</p>
-          <p class="total">🏆 VENTAS DEL DÍA: $${(stats.baseCaja + stats.efectivo + stats.nequi + stats.totalDomicilios).toLocaleString()}</p>
+          <p class="total">🏆 VENTAS DEL DÍA: $${(stats.baseCaja + stats.efectivo + stats.nequi).toLocaleString()}</p>
         </div>
       </body>
       </html>
@@ -434,6 +439,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
   };
 
   const marcarPagado = (f) => { setFiadoAPagar(f); setFechaPagoFiado(new Date().toISOString().split('T')[0]); setMetodoPagoFiado("efectivo"); setEfectivoMixto(0); setNequiMixto(0); setShowModalPagarFiado(true); };
+  
   const procesarPago = async () => {
     if (!fiadoAPagar || !fechaPagoFiado) return alert("Datos incompletos");
     let efectivo = 0, nequi = 0, metodo = metodoPagoFiado;
@@ -460,8 +466,150 @@ const GersonReportes = ({ usuario, onLogout }) => {
   const formatearFecha = (str) => { if (!str) return ""; try { return new Date(str).toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); } catch { return str; } };
   const calcularMitad = () => { if (fiadoAPagar && metodoPagoFiado === 'mixto') { const mitad = Math.round(fiadoAPagar.valor / 2); setEfectivoMixto(mitad); setNequiMixto(fiadoAPagar.valor - mitad); } };
 
-  // ✅ FÓRMULA CORREGIDA: Ventas del Día = Base + Efectivo + Nequi + Domicilios
-  const ventasDelDia = stats.baseCaja + stats.efectivo + stats.nequi + stats.totalDomicilios;
+  // ============ FUNCIONES PARA DIVIDIR CUENTAS ============
+  
+  const calcularSubtotalPersona = (persona) => {
+    const mesa = mesas[mesaActual] || { items: [], domicilio: 0 };
+    let subtotal = 0;
+    mesa.items.forEach((item, idx) => {
+      const asignado = productosAsignados[idx];
+      if (asignado === persona) subtotal += item.precio * (item.cantidad || 1);
+      else if (asignado === "todos") subtotal += (item.precio * (item.cantidad || 1)) / personasDividir;
+    });
+    if (mesa.domicilio > 0) subtotal += mesa.domicilio / personasDividir;
+    return Math.round(subtotal);
+  };
+
+  const saveSales = async (nuevasVentas) => {
+    try {
+      await syncStorage.setItem("sales", nuevasVentas);
+      localStorage.setItem("sales", JSON.stringify(nuevasVentas));
+    } catch (error) {
+      console.error("Error guardando ventas:", error);
+      localStorage.setItem("sales", JSON.stringify(nuevasVentas));
+    }
+  };
+
+  const saveMesas = async (nuevasMesas) => {
+    try {
+      await syncStorage.setItem("orders", nuevasMesas);
+      localStorage.setItem("orders", JSON.stringify(nuevasMesas));
+    } catch (error) {
+      console.error("Error guardando mesas:", error);
+      localStorage.setItem("orders", JSON.stringify(nuevasMesas));
+    }
+  };
+
+  // Función para abrir modal de método de pago
+  const abrirModalMetodoPagoPersona = (persona) => {
+    const subtotal = calcularSubtotalPersona(persona);
+    setPersonaPendiente(persona);
+    setMetodoPagoPersona("efectivo");
+    setEfectivoPersona(subtotal);
+    setNequiPersona(0);
+    setShowModalMetodoPagoPersona(true);
+  };
+
+  // Función para pagar persona (llama al modal)
+  const pagarPersona = (persona) => {
+    abrirModalMetodoPagoPersona(persona);
+  };
+
+  // Procesar pago de persona con el método seleccionado
+  const procesarPagoPersona = async () => {
+    if (!personaPendiente) return;
+    
+    const subtotal = calcularSubtotalPersona(personaPendiente);
+    let efectivo = 0, nequi = 0, metodo = metodoPagoPersona;
+    
+    if (metodo === 'mixto') {
+      efectivo = efectivoPersona || 0;
+      nequi = nequiPersona || 0;
+      if (efectivo + nequi !== subtotal) {
+        alert(`⚠️ Los montos no suman el total ($${subtotal.toLocaleString()}).`);
+        return;
+      }
+    } else if (metodo === 'efectivo') {
+      efectivo = subtotal;
+    } else if (metodo === 'nequi') {
+      nequi = subtotal;
+    }
+    
+    setPagosRealizados(prev => ({ ...prev, [personaPendiente]: true }));
+    
+    let ventasArr = [];
+    try {
+      const saved = await syncStorage.getItem("sales");
+      ventasArr = (saved && Array.isArray(saved)) ? saved : (localStorage.getItem("sales") ? JSON.parse(localStorage.getItem("sales")) : []);
+    } catch (error) {
+      ventasArr = localStorage.getItem("sales") ? JSON.parse(localStorage.getItem("sales")) : [];
+    }
+
+    const fechaISO = fechaActiva ? `${fechaActiva}T${new Date().toTimeString().split(' ')[0]}` : new Date().toISOString();
+    const nuevaVenta = {
+      fecha: fechaISO, fechaSimple: fechaActiva,
+      mesa: mesas[mesaActual].tipo === "domicilio" ? `Domicilio ${mesaActual - 9}` : `Mesa ${mesaActual + 1}`,
+      total: subtotal, metodo: metodo,
+      domicilio: mesas[mesaActual].domicilio ? mesas[mesaActual].domicilio / personasDividir : 0,
+      tipo: mesas[mesaActual].tipo || "mesa",
+      persona: personaPendiente, dividido: true,
+      efectivo: efectivo,
+      nequi: nequi
+    };
+    
+    ventasArr.push(nuevaVenta);
+    await saveSales(ventasArr);
+
+    const datosFactura = {
+      id: Date.now(),
+      nombre: `Persona ${personaPendiente} - ${mesas[mesaActual].tipo === "domicilio" ? `Domicilio ${mesaActual - 9}` : `Mesa ${mesaActual + 1}`}`,
+      celular: "", tipo: mesas[mesaActual].tipo || "mesa",
+      fechaVenta: fechaActiva || new Date().toISOString().split('T')[0],
+      valor: subtotal, domicilio: mesas[mesaActual].domicilio ? mesas[mesaActual].domicilio / personasDividir : 0,
+      metodoPago: metodo,
+      montoEfectivo: efectivo,
+      montoNequi: nequi,
+      items: mesas[mesaActual].items.map((item, idx) => {
+        const asignado = productosAsignados[idx];
+        let cantidad = 0;
+        if (asignado === personaPendiente) cantidad = item.cantidad || 1;
+        else if (asignado === "todos") cantidad = (item.cantidad || 1) / personasDividir;
+        return { id: item.id || Math.random(), nombre: item.nombre, precio: item.precio, cantidad: Math.round(cantidad * 100) / 100 };
+      }).filter(i => i.cantidad > 0)
+    };
+    
+    PDFGenerator.generarFacturaVenta(datosFactura);
+    
+    alert(`✅ Pago Persona ${personaPendiente}: $${subtotal.toLocaleString()} (${metodo === 'efectivo' ? 'Efectivo' : metodo === 'nequi' ? 'Nequi' : 'Mixto'})`);
+    
+    const todasPagadas = Array.from({ length: personasDividir }, (_, i) => i + 1).every(p => pagosRealizados[p] || (p === personaPendiente));
+    
+    if (todasPagadas) {
+      const nuevas = [...mesas];
+      nuevas[mesaActual] = { ...nuevas[mesaActual], items: [], estado: "vacia", domicilio: 0 };
+      await saveMesas(nuevas);
+      setShowPagoIndividual(false);
+      setMesaActual(null);
+      alert("✅ Mesa liberada");
+    } else {
+      const sig = personaPendiente + 1;
+      if (sig <= personasDividir) {
+        setPersonaAPagar(sig);
+      } else {
+        setShowPagoIndividual(false);
+      }
+    }
+    setShowModalMetodoPagoPersona(false);
+    setPersonaPendiente(null);
+  };
+
+  // ============ FIN FUNCIONES DIVIDIR CUENTAS ============
+
+  // Fórmula corregida
+  const ventasDelDiaFinal = stats.baseCaja + stats.efectivo + stats.nequi;
+
+  // Simulación de mesas (para evitar errores, en la práctica se cargan desde Firebase)
+  const [mesas, setMesas] = useState([]);
 
   return (
     <div className="reportes-container" key={refreshKey}>
@@ -510,15 +658,13 @@ const GersonReportes = ({ usuario, onLogout }) => {
         <div className="kpi-card"><div className="kpi-label">🚚 TOTAL DOMICILIOS</div><div className="kpi-value">${stats.totalDomicilios.toLocaleString()}</div></div>
       </div>
 
-      {/* ✅ SECCIÓN CORREGIDA: VENTAS DEL DÍA (con la fórmula correcta) */}
       <div className="section-card" style={{ background: 'linear-gradient(135deg, #2b8a3e, #40c057)', color: 'white', textAlign: 'center' }}>
         <h2 style={{ color: 'white' }}>🏆 VENTAS DEL DÍA</h2>
-        <div style={{ fontSize: '4rem', fontWeight: '800' }}>${ventasDelDia.toLocaleString()}</div>
+        <div style={{ fontSize: '4rem', fontWeight: '800' }}>${ventasDelDiaFinal.toLocaleString()}</div>
         <p>{stats.count} ventas realizadas</p>
-        <p style={{ fontSize: '0.8rem', marginTop: '8px', opacity: 0.9 }}>Base + Efectivo + Nequi + Domicilios</p>
+        <p style={{ fontSize: '0.8rem', marginTop: '8px', opacity: 0.9 }}>Base + Efectivo + Nequi</p>
       </div>
 
-      {/* ✅ SECCIÓN DE VENTAS CON BOTÓN ELIMINAR */}
       <div className="section-card">
         <div className="flex justify-between items-center mb-4">
           <h2>📋 Ventas del Día</h2>
@@ -659,6 +805,54 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <div className="modal-content">
             <div className="modal-header"><h3>💳 Marcar Fiado como Pagado</h3><button onClick={() => { setShowModalPagarFiado(false); setFiadoAPagar(null); }} className="modal-close">×</button></div>
             <div className="modal-body"><p className="font-bold">Cliente: {fiadoAPagar.nombre}</p><p>Total: <span className="font-bold text-green-600">${fiadoAPagar.valor.toLocaleString()}</span></p><div className="mb-4"><label className="font-semibold">📅 Fecha de pago:</label><input type="date" className="w-full border rounded p-2 mt-1" value={fechaPagoFiado} onChange={e => setFechaPagoFiado(e.target.value)} /></div><div className="mb-4"><label className="font-semibold">💳 Método:</label><div className="flex gap-3 mt-2"><button onClick={() => setMetodoPagoFiado("efectivo")} className={`btn-tipo ${metodoPagoFiado === "efectivo" ? 'btn-tipo-active' : ''}`}>💵 Efectivo</button><button onClick={() => setMetodoPagoFiado("nequi")} className={`btn-tipo ${metodoPagoFiado === "nequi" ? 'btn-tipo-active' : ''}`}>📱 Nequi</button><button onClick={() => { setMetodoPagoFiado("mixto"); calcularMitad(); }} className={`btn-tipo ${metodoPagoFiado === "mixto" ? 'btn-tipo-active' : ''}`}>🔄 Mixto</button></div></div><div className="flex justify-end gap-2 mt-4"><button onClick={() => { setShowModalPagarFiado(false); setFiadoAPagar(null); }} className="btn btn-gray">Cancelar</button><button onClick={procesarPago} className="btn btn-green">✅ Confirmar</button></div></div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA SELECCIONAR MÉTODO DE PAGO AL DIVIDIR CUENTA */}
+      {showModalMetodoPagoPersona && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>💳 Método de pago - Persona {personaPendiente}</h3>
+              <button onClick={() => setShowModalMetodoPagoPersona(false)} className="modal-close">×</button>
+            </div>
+            <div className="modal-body">
+              <p className="font-bold mb-4">Total a pagar: <span className="text-green-600">${calcularSubtotalPersona(personaPendiente).toLocaleString()}</span></p>
+              
+              <div className="mb-4">
+                <label className="font-semibold">💳 Método de pago:</label>
+                <div className="flex gap-3 mt-2">
+                  <button onClick={() => setMetodoPagoPersona("efectivo")} className={`btn-tipo ${metodoPagoPersona === "efectivo" ? 'btn-tipo-active' : ''}`}>💵 Efectivo</button>
+                  <button onClick={() => setMetodoPagoPersona("nequi")} className={`btn-tipo ${metodoPagoPersona === "nequi" ? 'btn-tipo-active' : ''}`}>📱 Nequi</button>
+                  <button onClick={() => setMetodoPagoPersona("mixto")} className={`btn-tipo ${metodoPagoPersona === "mixto" ? 'btn-tipo-active' : ''}`}>🔄 Mixto</button>
+                </div>
+              </div>
+              
+              {metodoPagoPersona === "mixto" && (
+                <div className="p-3 bg-blue-50 rounded">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">💵 Efectivo:</label>
+                      <input type="number" className="w-full border rounded p-2" value={efectivoPersona} onChange={(e) => { const val = parseInt(e.target.value) || 0; setEfectivoPersona(val); setNequiPersona(calcularSubtotalPersona(personaPendiente) - val); }} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">📱 Nequi:</label>
+                      <input type="number" className="w-full border rounded p-2" value={nequiPersona} onChange={(e) => { const val = parseInt(e.target.value) || 0; setNequiPersona(val); setEfectivoPersona(calcularSubtotalPersona(personaPendiente) - val); }} />
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm">
+                    {efectivoPersona + nequiPersona !== calcularSubtotalPersona(personaPendiente) && (
+                      <span className="text-red-600">⚠️ Total: ${(efectivoPersona + nequiPersona).toLocaleString()} / ${calcularSubtotalPersona(personaPendiente).toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer flex gap-2">
+              <button onClick={() => setShowModalMetodoPagoPersona(false)} className="btn btn-gray">Cancelar</button>
+              <button onClick={procesarPagoPersona} className="btn btn-green" disabled={metodoPagoPersona === "mixto" && (efectivoPersona + nequiPersona !== calcularSubtotalPersona(personaPendiente))}>✅ Confirmar</button>
+            </div>
           </div>
         </div>
       )}
