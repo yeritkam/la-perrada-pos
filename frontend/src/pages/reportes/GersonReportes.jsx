@@ -142,28 +142,55 @@ const GersonReportes = ({ usuario, onLogout }) => {
     finally { setTimeout(() => setIsRefreshing(false), 500); }
   }, [isRefreshing]);
 
+  // ✅ FUNCIÓN CORREGIDA: Calcular estadísticas
   const calcularEstadisticas = (ventasPorDia) => {
-    let totalVentas = 0, efectivo = 0, nequi = 0, domicilios = 0, count = 0;
+    let totalVentas = 0;
+    let efectivo = 0;
+    let nequi = 0;
+    let totalDomicilios = 0;
+    let count = 0;
+    
     ventasPorDia.forEach(v => {
-      const tv = parseInt(v.total) || 0;
-      const dom = parseInt(v.domicilio) || 0;
-      if (v.tipo === "fiado") totalVentas += tv;
-      else { totalVentas += tv + dom; domicilios += dom; }
+      const totalVenta = parseInt(v.total) || 0;
+      const domicilio = parseInt(v.domicilio) || 0;
+      
+      // Sumar domicilios por separado (solo el costo de envío)
+      totalDomicilios += domicilio;
+      
+      // Para el total de ventas del día: productos + domicilios
+      totalVentas += totalVenta + domicilio;
+      
       count++;
-      const totalPagar = v.tipo === "fiado" ? tv : tv + dom;
+      
+      // Calcular métodos de pago
+      const totalPagar = totalVenta + domicilio;
       switch(v.metodo) {
-        case 'efectivo': efectivo += totalPagar; break;
-        case 'nequi': nequi += totalPagar; break;
-        case 'mixto':
-          if (v.efectivo && v.nequi) { efectivo += parseInt(v.efectivo) || 0; nequi += parseInt(v.nequi) || 0; }
-          else { efectivo += Math.round(totalPagar / 2); nequi += Math.round(totalPagar / 2); }
+        case 'efectivo':
+          efectivo += totalPagar;
           break;
-        default: efectivo += totalPagar;
+        case 'nequi':
+          nequi += totalPagar;
+          break;
+        case 'mixto':
+          if (v.efectivo && v.nequi) {
+            efectivo += parseInt(v.efectivo) || 0;
+            nequi += parseInt(v.nequi) || 0;
+          } else {
+            efectivo += Math.round(totalPagar / 2);
+            nequi += Math.round(totalPagar / 2);
+          }
+          break;
+        default:
+          efectivo += totalPagar;
       }
     });
+    
     return {
-      totalVentas: Math.round(totalVentas), efectivo: Math.round(efectivo),
-      nequi: Math.round(nequi), domicilios: Math.round(domicilios), count,
+      totalVentas: Math.round(totalVentas),
+      efectivo: Math.round(efectivo),
+      nequi: Math.round(nequi),
+      totalDomicilios: Math.round(totalDomicilios),
+      count,
       baseCaja: Math.round(baseCaja)
     };
   };
@@ -178,6 +205,39 @@ const GersonReportes = ({ usuario, onLogout }) => {
   });
 
   const stats = calcularEstadisticas(ventasPorDia);
+
+  // ✅ FUNCIÓN PARA ELIMINAR VENTA
+  const eliminarVenta = async (index) => {
+    if (!window.confirm("¿Estás seguro de eliminar esta venta? Esta acción no se puede deshacer.")) {
+      return;
+    }
+
+    const ventaAEliminar = ventasPorDia[index];
+    
+    // Filtrar las ventas para eliminar la seleccionada
+    const nuevasVentas = ventas.filter(v => {
+      // Comparar si es la misma venta
+      const fechaVenta = v.fecha?.split('T')[0] || "";
+      const fechaSeleccionadaVenta = fechaSeleccionada;
+      
+      return !(fechaVenta === fechaSeleccionadaVenta && 
+               v.mesa === ventaAEliminar.mesa && 
+               v.total === ventaAEliminar.total &&
+               v.metodo === ventaAEliminar.metodo);
+    });
+
+    try {
+      await syncStorage.setItem("sales", nuevasVentas);
+      setVentas(nuevasVentas);
+      alert("✅ Venta eliminada correctamente");
+      refrescarDatos();
+    } catch (error) {
+      console.error("Error eliminando venta:", error);
+      localStorage.setItem("sales", JSON.stringify(nuevasVentas));
+      setVentas(nuevasVentas);
+      alert("✅ Venta eliminada (modo offline)");
+    }
+  };
 
   const abrirCaja = async () => {
     if (!fechaSeleccionada) return alert("Selecciona una fecha");
@@ -286,7 +346,7 @@ const GersonReportes = ({ usuario, onLogout }) => {
           body { font-family: Arial, sans-serif; padding: 20px; }
           .header { background: linear-gradient(135deg, #2b2d42 0%, #4c6ef5 100%); color: white; padding: 20px; text-align: center; border-radius: 10px; }
           .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
-          .ganancia { color: #2b8a3e; font-size: 20px; font-weight: bold; }
+          .total { color: #2b8a3e; font-size: 20px; font-weight: bold; }
         </style>
       </head>
       <body>
@@ -300,8 +360,8 @@ const GersonReportes = ({ usuario, onLogout }) => {
           <p>Base de Caja: $${stats.baseCaja.toLocaleString()}</p>
           <p>Efectivo Recaudado: $${stats.efectivo.toLocaleString()}</p>
           <p>Nequi Recaudado: $${stats.nequi.toLocaleString()}</p>
-          <p>Total Domicilios: $${stats.domicilios.toLocaleString()}</p>
-          <p class="ganancia">🏆 GANANCIA DEL DÍA: $${stats.totalVentas.toLocaleString()}</p>
+          <p>Total Domicilios: $${stats.totalDomicilios.toLocaleString()}</p>
+          <p class="total">🏆 VENTAS DEL DÍA: $${(stats.baseCaja + stats.efectivo + stats.nequi + stats.totalDomicilios).toLocaleString()}</p>
         </div>
       </body>
       </html>
@@ -400,6 +460,9 @@ const GersonReportes = ({ usuario, onLogout }) => {
   const formatearFecha = (str) => { if (!str) return ""; try { return new Date(str).toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); } catch { return str; } };
   const calcularMitad = () => { if (fiadoAPagar && metodoPagoFiado === 'mixto') { const mitad = Math.round(fiadoAPagar.valor / 2); setEfectivoMixto(mitad); setNequiMixto(fiadoAPagar.valor - mitad); } };
 
+  // ✅ FÓRMULA CORREGIDA: Ventas del Día = Base + Efectivo + Nequi + Domicilios
+  const ventasDelDia = stats.baseCaja + stats.efectivo + stats.nequi + stats.totalDomicilios;
+
   return (
     <div className="reportes-container" key={refreshKey}>
       <div className="tiempo-real-indicator" style={{ position: 'fixed', top: '10px', right: '10px', background: sincronizacionActiva ? (isRefreshing ? '#f59e0b' : '#10b981') : '#ef4444', color: 'white', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -444,13 +507,86 @@ const GersonReportes = ({ usuario, onLogout }) => {
         <div className="kpi-card"><div className="kpi-label">💰 BASE DE CAJA</div><div className="kpi-value">${stats.baseCaja.toLocaleString()}</div></div>
         <div className="kpi-card"><div className="kpi-label">💵 EFECTIVO RECAUDADO</div><div className="kpi-value">${stats.efectivo.toLocaleString()}</div></div>
         <div className="kpi-card"><div className="kpi-label">📱 NEQUI RECAUDADO</div><div className="kpi-value">${stats.nequi.toLocaleString()}</div></div>
-        <div className="kpi-card"><div className="kpi-label">🚚 TOTAL DOMICILIOS</div><div className="kpi-value">${stats.domicilios.toLocaleString()}</div></div>
+        <div className="kpi-card"><div className="kpi-label">🚚 TOTAL DOMICILIOS</div><div className="kpi-value">${stats.totalDomicilios.toLocaleString()}</div></div>
       </div>
 
+      {/* ✅ SECCIÓN CORREGIDA: VENTAS DEL DÍA (con la fórmula correcta) */}
       <div className="section-card" style={{ background: 'linear-gradient(135deg, #2b8a3e, #40c057)', color: 'white', textAlign: 'center' }}>
-        <h2 style={{ color: 'white' }}>🏆 GANANCIA DEL DÍA</h2>
-        <div style={{ fontSize: '4rem', fontWeight: '800' }}>${stats.totalVentas.toLocaleString()}</div>
+        <h2 style={{ color: 'white' }}>🏆 VENTAS DEL DÍA</h2>
+        <div style={{ fontSize: '4rem', fontWeight: '800' }}>${ventasDelDia.toLocaleString()}</div>
         <p>{stats.count} ventas realizadas</p>
+        <p style={{ fontSize: '0.8rem', marginTop: '8px', opacity: 0.9 }}>Base + Efectivo + Nequi + Domicilios</p>
+      </div>
+
+      {/* ✅ SECCIÓN DE VENTAS CON BOTÓN ELIMINAR */}
+      <div className="section-card">
+        <div className="flex justify-between items-center mb-4">
+          <h2>📋 Ventas del Día</h2>
+          <div className="flex gap-2">
+            <span className="text-sm text-gray-600">{ventasPorDia.length} ventas</span>
+            <button onClick={exportarCSV} className="btn btn-blue btn-sm" disabled={ventasPorDia.length === 0}>📥 Exportar CSV</button>
+          </div>
+        </div>
+        {ventasPorDia.length === 0 ? (
+          <p className="text-center text-gray-500 py-4">No hay ventas registradas para esta fecha</p>
+        ) : (
+          <div className="ventas-cuadro-container">
+            <div className="ventas-cuadro-header">
+              <div className="ventas-cuadro-col-cliente">Cliente</div>
+              <div className="ventas-cuadro-col-tipo">Tipo</div>
+              <div className="ventas-cuadro-col-metodo">Método</div>
+              <div className="ventas-cuadro-col-total">Total</div>
+              <div className="ventas-cuadro-col-detalle">Detalle Pago</div>
+              <div className="ventas-cuadro-col-productos">Productos</div>
+              <div className="ventas-cuadro-col-acciones">Acciones</div>
+            </div>
+            <div className="ventas-cuadro-scroll">
+              {ventasPorDia.map((venta, index) => (
+                <div key={index} className="venta-cuadro-item">
+                  <div className="ventas-cuadro-col-cliente">
+                    <span className="venta-cuadro-cliente">{venta.mesa || "Sin nombre"}</span>
+                    {venta.domicilio > 0 && <span className="venta-cuadro-domicilio">🚚</span>}
+                  </div>
+                  <div className="ventas-cuadro-col-tipo">
+                    {venta.tipo === "fiado" ? <span className="badge badge-purple">Fiado</span> : <span className="badge badge-green">Normal</span>}
+                  </div>
+                  <div className="ventas-cuadro-col-metodo">
+                    {venta.metodo === "efectivo" ? "💰" : venta.metodo === "nequi" ? "📱" : venta.metodo === "mixto" ? "🔄" : "💳"}
+                  </div>
+                  <div className="ventas-cuadro-col-total">
+                    <span className="venta-cuadro-total">${(parseInt(venta.total) + parseInt(venta.domicilio || 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="ventas-cuadro-col-detalle">
+                    {venta.metodo === "mixto" ? (
+                      <div className="text-xs">
+                        <div>💵 ${venta.efectivo?.toLocaleString() || "0"}</div>
+                        <div>📱 ${venta.nequi?.toLocaleString() || "0"}</div>
+                      </div>
+                    ) : venta.metodo === "efectivo" ? (
+                      <div className="text-xs text-green-600">💵 ${(parseInt(venta.total) + parseInt(venta.domicilio || 0)).toLocaleString()}</div>
+                    ) : venta.metodo === "nequi" ? (
+                      <div className="text-xs text-purple-600">📱 ${(parseInt(venta.total) + parseInt(venta.domicilio || 0)).toLocaleString()}</div>
+                    ) : "-"}
+                  </div>
+                  <div className="ventas-cuadro-col-productos">
+                    <div className="venta-cuadro-productos-lista">
+                      {venta.items?.map((item, itemIndex) => (
+                        <div key={itemIndex} className="producto-cuadro-item">
+                          <span className="producto-cuadro-nombre">{item.nombre}</span>
+                          <span className="producto-cuadro-cantidad">x{item.cantidad || 1}</span>
+                          <span className="producto-cuadro-precio">${((item.precio || 0) * (item.cantidad || 1)).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="ventas-cuadro-col-acciones">
+                    <button onClick={() => eliminarVenta(index)} className="producto-eliminar-btn" title="Eliminar esta venta">✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="section-card">
